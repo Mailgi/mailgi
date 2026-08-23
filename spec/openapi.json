@@ -1,0 +1,1346 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AgentMailbox API",
+    "version": "0.1.0",
+    "description": "Email service API for AI agents. Agents register with a W3C DID and receive a derived email address backed by Stalwart mail server."
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API key issued at agent registration"
+      }
+    },
+    "schemas": {}
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Liveness check",
+        "tags": [
+          "health"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "summary": "Readiness check \u2014 verifies database and Stalwart connectivity",
+        "tags": [
+          "health"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "checks": {
+                      "type": "object",
+                      "properties": {
+                        "database": {
+                          "type": "string"
+                        },
+                        "stalwart": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agents/register": {
+      "post": {
+        "summary": "Register a new agent",
+        "tags": [
+          "agents"
+        ],
+        "description": "Register an AI agent. Returns a friendly email handle, a deterministic alias address, and an API key (shown once). DID is optional \u2014 if provided it must be did:key: format and is used to derive the alias address.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "did": {
+                    "type": "string",
+                    "description": "Optional W3C DID (did:key: format). Used to derive a deterministic alias address."
+                  },
+                  "label": {
+                    "type": "string",
+                    "description": "Optional human-readable label for this agent"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agentId": {
+                      "type": "string"
+                    },
+                    "did": {
+                      "type": "string"
+                    },
+                    "emailAddress": {
+                      "type": "string"
+                    },
+                    "aliasAddress": {
+                      "type": "string"
+                    },
+                    "apiKey": {
+                      "type": "string"
+                    },
+                    "apiKeyId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agents/me": {
+      "get": {
+        "summary": "Get current agent profile",
+        "tags": [
+          "agents"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agentId": {
+                      "type": "string"
+                    },
+                    "did": {
+                      "type": "string"
+                    },
+                    "emailAddress": {
+                      "type": "string"
+                    },
+                    "aliasAddress": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete current agent account",
+        "tags": [
+          "agents"
+        ],
+        "description": "Soft-deletes the agent, revokes all API keys, and removes the Stalwart mail account.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/v1/apikeys/": {
+      "get": {
+        "summary": "List API keys",
+        "tags": [
+          "apikeys"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "keyPrefix": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "lastUsedAt": {
+                        "type": [
+                          "null",
+                          "string"
+                        ],
+                        "format": "date-time"
+                      },
+                      "expiresAt": {
+                        "type": [
+                          "null",
+                          "string"
+                        ],
+                        "format": "date-time"
+                      },
+                      "revokedAt": {
+                        "type": [
+                          "null",
+                          "string"
+                        ],
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new API key",
+        "tags": [
+          "apikeys"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "ISO 8601 expiry date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "apiKey": {
+                      "type": "string",
+                      "description": "Raw API key \u2014 shown once, store securely"
+                    },
+                    "keyPrefix": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "expiresAt": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apikeys/{keyId}": {
+      "delete": {
+        "summary": "Revoke an API key",
+        "tags": [
+          "apikeys"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "keyId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/v1/auth/challenge": {
+      "post": {
+        "summary": "Request a DID authentication challenge",
+        "tags": [
+          "auth"
+        ],
+        "description": "Issues a one-time nonce that the agent must sign with the private key corresponding to its DID.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "did"
+                ],
+                "properties": {
+                  "did": {
+                    "type": "string",
+                    "description": "The agent's W3C DID"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "nonce": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/verify": {
+      "post": {
+        "summary": "Verify a DID challenge signature and receive a JWT",
+        "tags": [
+          "auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "did",
+                  "nonce",
+                  "signature"
+                ],
+                "properties": {
+                  "did": {
+                    "type": "string"
+                  },
+                  "nonce": {
+                    "type": "string"
+                  },
+                  "signature": {
+                    "type": "string",
+                    "description": "Base64url-encoded signature of the nonce"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "expiresIn": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/mail/": {
+      "get": {
+        "summary": "List messages",
+        "tags": [
+          "mail"
+        ],
+        "description": "Returns a paginated list of message headers in the agent's mailbox. Use `mailboxId` to filter to a specific folder.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "mailboxId",
+            "required": false,
+            "description": "Filter to a specific mailbox (folder) ID"
+          },
+          {
+            "schema": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "description": "Max messages to return"
+          },
+          {
+            "schema": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0
+            },
+            "in": "query",
+            "name": "position",
+            "required": false,
+            "description": "Zero-based offset for pagination"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            },
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "description": "Sort by receivedAt"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "subject": {
+                            "type": "string"
+                          },
+                          "from": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "email": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "to": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "email": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "receivedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "size": {
+                            "type": "number"
+                          },
+                          "preview": {
+                            "type": "string"
+                          },
+                          "seen": {
+                            "type": "boolean"
+                          },
+                          "mailboxIds": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "boolean"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "total": {
+                      "type": "number",
+                      "description": "Total messages matching the filter"
+                    },
+                    "position": {
+                      "type": "number",
+                      "description": "Current offset"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/mail/{id}": {
+      "get": {
+        "summary": "Get a message with body",
+        "tags": [
+          "mail"
+        ],
+        "description": "Fetches a single message including its full HTML and/or plain-text body. Body content is in `htmlBody` or `textBody`; use `bodyValues` to resolve JMAP part IDs.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "JMAP message ID"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "subject": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "to": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "cc": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "receivedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "size": {
+                      "type": "number"
+                    },
+                    "preview": {
+                      "type": "string"
+                    },
+                    "seen": {
+                      "type": "boolean"
+                    },
+                    "htmlBody": {
+                      "description": "HTML body as string, or JMAP body part array if not yet fetched"
+                    },
+                    "textBody": {
+                      "description": "Plain-text body as string, or JMAP body part array"
+                    },
+                    "bodyValues": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "JMAP part ID \u2192 body value map"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Move message to Trash",
+        "tags": [
+          "mail"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/v1/mail/send": {
+      "post": {
+        "summary": "Send a message",
+        "tags": [
+          "mail"
+        ],
+        "description": "Send an email from the agent's address. Returns the JMAP message ID.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "to",
+                  "subject"
+                ],
+                "properties": {
+                  "to": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "description": "Recipient email addresses"
+                  },
+                  "cc": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "bcc": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "subject": {
+                    "type": "string"
+                  },
+                  "textBody": {
+                    "type": "string"
+                  },
+                  "htmlBody": {
+                    "type": "string"
+                  },
+                  "replyTo": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "messageId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/mail/{id}/move": {
+      "patch": {
+        "summary": "Move message to another mailbox",
+        "tags": [
+          "mail"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "mailboxId"
+                ],
+                "properties": {
+                  "mailboxId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/v1/mail/{id}/flags": {
+      "patch": {
+        "summary": "Set message flags (seen, flagged)",
+        "tags": [
+          "mail"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "seen": {
+                    "type": "boolean"
+                  },
+                  "flagged": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/v1/mailboxes/": {
+      "get": {
+        "summary": "List all mailboxes",
+        "tags": [
+          "mailboxes"
+        ],
+        "description": "Returns all mailboxes (folders) for the agent, including system folders (Inbox, Sent, Trash, etc.) and any custom folders.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "parentId": {
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      },
+                      "role": {
+                        "type": [
+                          "null",
+                          "string"
+                        ],
+                        "description": "System role: inbox, sent, trash, drafts, etc."
+                      },
+                      "totalEmails": {
+                        "type": "number"
+                      },
+                      "unreadEmails": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new mailbox",
+        "tags": [
+          "mailboxes"
+        ],
+        "description": "Creates a custom folder. Optionally nest it under an existing folder with `parentId`.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Folder name"
+                  },
+                  "parentId": {
+                    "type": "string",
+                    "description": "Parent mailbox ID for nesting"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "parentId": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "role": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "totalEmails": {
+                      "type": "number"
+                    },
+                    "unreadEmails": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/mailboxes/{id}": {
+      "delete": {
+        "summary": "Delete a mailbox",
+        "tags": [
+          "mailboxes"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Rename a mailbox",
+        "tags": [
+          "mailboxes"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/v1/billing/": {
+      "get": {
+        "summary": "Get balance, deposit addresses, and pricing",
+        "tags": [
+          "billing"
+        ],
+        "description": "Returns the agent's current USDC balance, deposit addresses for topping up (created on first call when billing is configured), and pricing info. `depositAddresses` is null when `BILLING_HD_MNEMONIC` is unset (free mode).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "balanceUsd": {
+                      "type": "number",
+                      "description": "Current balance in USD"
+                    },
+                    "depositAddresses": {
+                      "description": "USDC deposit addresses, or null if billing is not configured",
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "evm": {
+                              "type": "string",
+                              "description": "EVM address valid on Ethereum mainnet and Base"
+                            },
+                            "solana": {
+                              "type": "string",
+                              "description": "Solana mainnet address"
+                            }
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "pricePerExternalEmail": {
+                      "type": "number",
+                      "description": "Cost in USD per external recipient"
+                    },
+                    "acceptedToken": {
+                      "type": "string",
+                      "description": "Accepted token (USDC)"
+                    },
+                    "networks": {
+                      "type": "object",
+                      "properties": {
+                        "evm": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "solana": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/billing/transactions": {
+      "get": {
+        "summary": "List balance transactions",
+        "tags": [
+          "billing"
+        ],
+        "description": "Returns a paginated list of deposits and deductions in reverse chronological order. Deposits include the on-chain `txHash` and `chain`; deductions include `emailCount`.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "description": "Max transactions to return"
+          },
+          {
+            "schema": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0
+            },
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "description": "Zero-based offset for pagination"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "transactions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "deposit",
+                              "deduction"
+                            ]
+                          },
+                          "amountUsd": {
+                            "type": "number",
+                            "description": "Positive for deposits, negative for deductions"
+                          },
+                          "txHash": {
+                            "type": [
+                              "null",
+                              "string"
+                            ],
+                            "description": "On-chain transaction hash (deposits only)"
+                          },
+                          "chain": {
+                            "type": [
+                              "null",
+                              "string"
+                            ],
+                            "description": "Chain name: ethereum, base, or solana (deposits only)"
+                          },
+                          "emailCount": {
+                            "type": [
+                              "null",
+                              "number"
+                            ],
+                            "description": "Number of external recipients billed (deductions only)"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "total": {
+                      "type": "number",
+                      "description": "Total transaction count for pagination"
+                    },
+                    "limit": {
+                      "type": "number"
+                    },
+                    "offset": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "health",
+      "description": "Health checks"
+    },
+    {
+      "name": "agents",
+      "description": "Agent registration and management"
+    },
+    {
+      "name": "apikeys",
+      "description": "API key management"
+    },
+    {
+      "name": "auth",
+      "description": "DID challenge-response authentication"
+    },
+    {
+      "name": "mail",
+      "description": "Email operations via JMAP"
+    },
+    {
+      "name": "mailboxes",
+      "description": "Mailbox management via JMAP"
+    },
+    {
+      "name": "billing",
+      "description": "Balance and transaction history (operator use)"
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import { AgentSidebar } from "./components/AgentSidebar.js";
 import { Inbox } from "./components/Inbox.js";
 import { Compose } from "./components/Compose.js";
 import { Billing } from "./components/Billing.js";
+import { Dashboard } from "./dashboard/Dashboard.js";
 import {
   getActiveEnvName,
   setActiveEnvName,
@@ -14,6 +15,7 @@ import {
 } from "./lib/environments.js";
 
 type View = "inbox" | "compose" | "billing";
+type Mode = "devtools" | "dashboard";
 
 const s: Record<string, React.CSSProperties> = {
   app: { display: "flex", width: "100%", height: "100%" },
@@ -54,6 +56,11 @@ export default function App() {
   const [activeEnv, setActiveEnv] = useState<EnvName>(getActiveEnvName);
   const { agents, selected, addAgent, removeAgent, selectAgent } = useAgents(activeEnv);
   const [view, setView] = useState<View>("inbox");
+  // Dashboard is a distinct product surface (session/OAuth-authenticated org
+  // management) from the dev tool below it (API-key-authenticated, single
+  // agent at a time) -- kept as a mode switch on one app rather than a second
+  // app, per #3's own note that they can share the client and components.
+  const [mode, setMode] = useState<Mode>("devtools");
 
   const envUrl = getActiveEnv().url;
 
@@ -65,6 +72,23 @@ export default function App() {
     }
     setActiveEnvName(name);
     setActiveEnv(name);
+  }
+
+  if (mode === "dashboard") {
+    return (
+      <div style={s.app}>
+        <div style={{ ...s.main }}>
+          <div style={s.topbar}>
+            <button style={{ ...s.tab, ...s.tabActive }} onClick={() => setMode("devtools")}>
+              ← Dev tools
+            </button>
+          </div>
+          <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
+            <Dashboard apiBaseUrl={envUrl} />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -103,6 +127,12 @@ export default function App() {
           {selected && (
             <span style={s.agentTag}>{selected.emailAddress}</span>
           )}
+          <button
+            style={{ ...s.tab, marginLeft: selected ? 12 : "auto" }}
+            onClick={() => setMode("dashboard")}
+          >
+            Dashboard →
+          </button>
         </div>
 
         <div style={s.content}>

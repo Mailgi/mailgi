@@ -1,0 +1,36 @@
+# Production image: builds the static Vite bundle and serves it.
+#
+# Build context must be the repo root so npm workspaces can resolve
+# @mailgi/mailgi -- same requirement as the dev Dockerfile.
+#   docker build -f apps/ui/Dockerfile.prod -t mailgi-dashboard .
+#
+# VITE_API_BASE_URL is a BUILD-time argument, not a runtime env var: Vite
+# inlines import.meta.env values into the JS bundle at build time, so it must
+# be available before `npm run build` runs. Set it as a Railway service
+# variable named VITE_API_BASE_URL -- Railway passes matching variables as
+# build args automatically for Dockerfile builds.
+FROM node:20-alpine AS builder
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+COPY packages/typescript/package.json packages/typescript/
+COPY apps/ui/package.json apps/ui/
+RUN npm install
+
+COPY packages/typescript packages/typescript
+COPY apps/ui apps/ui
+RUN npm run build -w @mailgi/mailgi
+RUN npm run build -w @mailgi/ui
+
+# Runtime: a plain static file server. This is a single-page app with no
+# client-side router (all navigation is in-component state), so no SPA
+# fallback rewriting is needed -- every real request is for "/" or a static
+# asset.
+FROM node:20-alpine AS runner
+WORKDIR /app
+RUN npm install -g serve@14
+COPY --from=builder /app/apps/ui/dist ./dist
+EXPOSE 3000
+CMD ["serve", "-s", "dist", "-l", "3000"]

@@ -16,6 +16,8 @@ import type {
   CreateApiKeyRequest,
   CreateApiKeyResponse,
   CreateMailboxRequest,
+  CreateWebhookEndpointRequest,
+  CreateWebhookEndpointResponse,
   Email,
   EmailWithBody,
   HealthResponse,
@@ -28,6 +30,8 @@ import type {
   SendMailResponse,
   VerifyRequest,
   VerifyResponse,
+  ListWebhookEndpointsResponse,
+  WebhookEndpoint,
 } from './types.js';
 
 export interface ClientOptions {
@@ -336,6 +340,42 @@ export class AgentMailboxClient {
      */
     ready: (): Promise<HealthResponse> =>
       this.request<HealthResponse>('GET', '/health/ready', undefined, false),
+  };
+
+  // ---------------------------------------------------------------------------
+  // webhooks namespace — inbound mail notifications
+  // ---------------------------------------------------------------------------
+
+  readonly webhooks = {
+    /**
+     * Subscribe a URL to this agent's inbound mail.
+     *
+     * The response contains `secret`, shown **once** — store it, and verify
+     * every notification with `verifyWebhookSignature()` before acting on it.
+     *
+     * `scope: 'domain'` currently returns HTTP 501; see the type docs.
+     */
+    create: (req: CreateWebhookEndpointRequest): Promise<CreateWebhookEndpointResponse> =>
+      this.request<CreateWebhookEndpointResponse>('POST', '/v1/webhook-endpoints/', req),
+
+    /**
+     * List this agent's webhook endpoints.
+     *
+     * Secrets are absent by design — they are returned only at creation.
+     * An endpoint disabled by repeated delivery failures carries
+     * `disabledAt` and `disabledReason`.
+     */
+    list: async (): Promise<WebhookEndpoint[]> => {
+      const res = await this.request<ListWebhookEndpointsResponse>(
+        'GET',
+        '/v1/webhook-endpoints/',
+      );
+      return res.endpoints;
+    },
+
+    /** Delete a webhook endpoint. Deliveries stop immediately. */
+    delete: (id: string): Promise<void> =>
+      this.request<void>('DELETE', `/v1/webhook-endpoints/${encodeURIComponent(id)}`),
   };
 
   // Expose types used by typed consumers

@@ -2,6 +2,15 @@ export { AgentMailboxClient } from './client.js';
 export type { ClientOptions } from './client.js';
 
 export {
+  verifyWebhookSignature,
+  signWebhookPayload,
+} from './webhooks.js';
+export type {
+  VerifyWebhookOptions,
+  VerifyWebhookResult,
+} from './webhooks.js';
+
+export {
   AgentMailboxError,
   BadRequestError,
   ConflictError,
@@ -36,4 +45,10 @@ export type {
   SendMailResponse,
   VerifyRequest,
   VerifyResponse,
+  CreateWebhookEndpointRequest,
+  CreateWebhookEndpointResponse,
+  ListWebhookEndpointsResponse,
+  WebhookEndpoint,
+  WebhookAttachment,
+  InboundMailNotification,
 } from './types.js';

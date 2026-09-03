@@ -30,7 +30,9 @@ import type {
   SendMailResponse,
   VerifyRequest,
   VerifyResponse,
+  ListWebhookDeliveriesResponse,
   ListWebhookEndpointsResponse,
+  WebhookDelivery,
   WebhookEndpoint,
 } from './types.js';
 
@@ -376,6 +378,50 @@ export class AgentMailboxClient {
     /** Delete a webhook endpoint. Deliveries stop immediately. */
     delete: (id: string): Promise<void> =>
       this.request<void>('DELETE', `/v1/webhook-endpoints/${encodeURIComponent(id)}`),
+
+    /**
+     * Recent delivery attempts for an endpoint — what was sent, what your
+     * endpoint returned, and when the next retry is due.
+     *
+     * `lastResponseCode` and `lastResponseBody` are how you diagnose your own
+     * handler without instrumenting it.
+     */
+    deliveries: async (id: string): Promise<WebhookDelivery[]> => {
+      const res = await this.request<ListWebhookDeliveriesResponse>(
+        'GET',
+        `/v1/webhook-endpoints/${encodeURIComponent(id)}/deliveries`,
+      );
+      return res.deliveries;
+    },
+
+    /**
+     * Re-queue one delivery attempt.
+     *
+     * Resets the attempt count to zero rather than resuming it: a manual
+     * resend follows fixing something, so continuing from 5 of 6 would give
+     * one attempt and disable the endpoint again.
+     *
+     * Rejected with 400 if the endpoint is disabled — re-enable it first.
+     */
+    resendDelivery: (id: string, deliveryId: string): Promise<{ id: string; status: string }> =>
+      this.request<{ id: string; status: string }>(
+        'POST',
+        `/v1/webhook-endpoints/${encodeURIComponent(id)}/deliveries/${encodeURIComponent(deliveryId)}/resend`,
+      ),
+
+    /**
+     * Re-enable an endpoint that repeated failures disabled.
+     *
+     * The signing secret survives — recovering by delete-and-recreate would
+     * issue a new one and break your verification until you redeploy. Pending
+     * deliveries are also rescheduled immediately rather than waiting out a
+     * backoff earned while the endpoint was down.
+     */
+    enable: (id: string): Promise<{ id: string; enabled: boolean }> =>
+      this.request<{ id: string; enabled: boolean }>(
+        'POST',
+        `/v1/webhook-endpoints/${encodeURIComponent(id)}/enable`,
+      ),
   };
 
   // Expose types used by typed consumers

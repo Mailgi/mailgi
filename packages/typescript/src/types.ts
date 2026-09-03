@@ -266,3 +266,23 @@ export interface InboundMailNotification {
   /** Absolute URL for fetching the full message, or null if enrichment failed. */
   fetchUrl: string | null;
 }
+
+export interface WebhookDelivery {
+  id: string;
+  /** The Stalwart ingest event this delivery came from. */
+  stalwartEventId: string;
+  agentId: string;
+  status: string;
+  /** Reset to 0 by a manual resend, so a fixed endpoint gets a full budget. */
+  attempts: number;
+  nextAttemptAt: string | null;
+  lastResponseCode: number | null;
+  /** Truncated excerpt of the endpoint's response body. */
+  lastResponseBody: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ListWebhookDeliveriesResponse {
+  deliveries: WebhookDelivery[];
+}

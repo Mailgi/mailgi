@@ -49,6 +49,8 @@ export type {
   CreateWebhookEndpointResponse,
   ListWebhookEndpointsResponse,
   WebhookEndpoint,
+  WebhookDelivery,
+  ListWebhookDeliveriesResponse,
   WebhookAttachment,
   InboundMailNotification,
 } from './types.js';

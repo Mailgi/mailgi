@@ -2179,6 +2179,213 @@
                 }
             }
         },
+        "/v1/orgs/{orgId}/webhook-endpoints/": {
+            "get": {
+                "summary": "List webhook endpoints for this org",
+                "tags": [
+                    "webhooks"
+                ],
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string"
+                        },
+                        "in": "path",
+                        "name": "orgId",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Default Response"
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create a webhook endpoint for one of this org's inboxes",
+                "tags": [
+                    "webhooks"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "agentId",
+                                    "url"
+                                ],
+                                "properties": {
+                                    "agentId": {
+                                        "type": "string"
+                                    },
+                                    "url": {
+                                        "type": "string"
+                                    },
+                                    "eventTypes": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "default": [
+                                            "mail.received"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string"
+                        },
+                        "in": "path",
+                        "name": "orgId",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Default Response"
+                    }
+                }
+            }
+        },
+        "/v1/orgs/{orgId}/webhook-endpoints/{id}": {
+            "delete": {
+                "summary": "Delete a webhook endpoint",
+                "tags": [
+                    "webhooks"
+                ],
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string"
+                        },
+                        "in": "path",
+                        "name": "orgId",
+                        "required": true
+                    },
+                    {
+                        "schema": {
+                            "type": "string"
+                        },
+                        "in": "path",
+                        "name": "id",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Default Response"
+                    }
+                }
+            }
+        },
+        "/v1/orgs/{orgId}/webhook-endpoints/{id}/enable": {
+            "post": {
+                "summary": "Re-enable an endpoint disabled by failures",
+                "tags": [
+                    "webhooks"
+                ],
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string"
+                        },
+                        "in": "path",
+                        "name": "orgId",
+                        "required": true
+                    },
+                    {
+                        "schema": {
+                            "type": "string"
+                        },
+                        "in": "path",
+                        "name": "id",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Default Response"
+                    }
+                }
+            }
+        },
+        "/v1/orgs/{orgId}/webhook-endpoints/{id}/deliveries": {
+            "get": {
+                "summary": "Recent delivery attempts for an endpoint",
+                "tags": [
+                    "webhooks"
+                ],
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string"
+                        },
+                        "in": "path",
+                        "name": "orgId",
+                        "required": true
+                    },
+                    {
+                        "schema": {
+                            "type": "string"
+                        },
+                        "in": "path",
+                        "name": "id",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Default Response"
+                    }
+                }
+            }
+        },
+        "/v1/orgs/{orgId}/webhook-endpoints/{id}/deliveries/{deliveryId}/resend": {
+            "post": {
+                "summary": "Re-queue a delivery attempt",
+                "tags": [
+                    "webhooks"
+                ],
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string"
+                        },
+                        "in": "path",
+                        "name": "orgId",
+                        "required": true
+                    },
+                    {
+                        "schema": {
+                            "type": "string"
+                        },
+                        "in": "path",
+                        "name": "id",
+                        "required": true
+                    },
+                    {
+                        "schema": {
+                            "type": "string"
+                        },
+                        "in": "path",
+                        "name": "deliveryId",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Default Response"
+                    }
+                }
+            }
+        },
         "/v1/orgs/{orgId}/domains/{domainId}/registration-tokens/": {
             "post": {
                 "summary": "Create a registration token for agents to self-register on this domain",
@@ -2489,6 +2696,98 @@
         "/v1/webhook-endpoints/{id}": {
             "delete": {
                 "summary": "Delete a webhook endpoint",
+                "tags": [
+                    "webhooks"
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string"
+                        },
+                        "in": "path",
+                        "name": "id",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Default Response"
+                    }
+                }
+            }
+        },
+        "/v1/webhook-endpoints/{id}/deliveries": {
+            "get": {
+                "summary": "List recent delivery attempts for an endpoint",
+                "tags": [
+                    "webhooks"
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string"
+                        },
+                        "in": "path",
+                        "name": "id",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Default Response"
+                    }
+                }
+            }
+        },
+        "/v1/webhook-endpoints/{id}/deliveries/{deliveryId}/resend": {
+            "post": {
+                "summary": "Re-queue a delivery attempt",
+                "tags": [
+                    "webhooks"
+                ],
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "schema": {
+                            "type": "string"
+                        },
+                        "in": "path",
+                        "name": "id",
+                        "required": true
+                    },
+                    {
+                        "schema": {
+                            "type": "string"
+                        },
+                        "in": "path",
+                        "name": "deliveryId",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Default Response"
+                    }
+                }
+            }
+        },
+        "/v1/webhook-endpoints/{id}/enable": {
+            "post": {
+                "summary": "Re-enable an endpoint disabled by repeated failures",
                 "tags": [
                     "webhooks"
                 ],

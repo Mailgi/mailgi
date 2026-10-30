@@ -3,7 +3,7 @@ import { type Command } from 'commander';
 import type { JmapBodyPart } from '../../types.js';
 import { getClient } from '../config.js';
 import { table, truncate, formatDate, stripHtml } from '../utils/format.js';
-import { fail, ok, printJson } from '../utils/output.js';
+import { billingWarning, fail, ok, printJson } from '../utils/output.js';
 
 export function registerMailCommands(program: Command): void {
   // inbox
@@ -22,7 +22,7 @@ export function registerMailCommands(program: Command): void {
         fail(err instanceof Error ? err.message : String(err));
       }
       if (json) { printJson(result); return; }
-      if (result.messages.length === 0) { ok('Inbox is empty.'); return; }
+      if (result.messages.length === 0) { ok('Inbox is empty.'); billingWarning(result.billing); return; }
       table(
         ['ID', 'From', 'Subject', 'Date', ''],
         result.messages.map((m) => [
@@ -34,6 +34,7 @@ export function registerMailCommands(program: Command): void {
         ]),
       );
       ok(`\n${result.total} total message(s)`);
+      billingWarning(result.billing);
     });
 
   // read
@@ -58,6 +59,7 @@ export function registerMailCommands(program: Command): void {
       ok(`To:      ${msg.to.map((a) => a.email).join(', ')}`);
       if (msg.cc?.length) ok(`CC:      ${msg.cc.map((a) => a.email).join(', ')}`);
       ok(`Subject: ${msg.subject}`);
+      billingWarning(msg.billing);
       ok(`Date:    ${formatDate(msg.receivedAt)}`);
       ok('');
 
@@ -123,6 +125,7 @@ export function registerMailCommands(program: Command): void {
 
       if (json) { printJson(result); return; }
       ok(`Sent. Message ID: ${result.messageId}`);
+      billingWarning(result.billing);
     });
 
   // delete

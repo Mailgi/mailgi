@@ -3,6 +3,7 @@ import {
   BadRequestError,
   ConflictError,
   NotFoundError,
+  PaymentRequiredError,
   UnauthorizedError,
 } from './errors.js';
 import type {
@@ -10,6 +11,8 @@ import type {
   ApiKey,
   BalanceTransaction,
   BillingInfo,
+  PaymentRequiredDetails,
+  TopupResponse,
   ListTransactionsOptions,
   ListTransactionsResponse,
   ChallengeResponse,
@@ -110,11 +113,12 @@ export class AgentMailboxClient {
     if (!response.ok) {
       let errorMessage: string;
       let errorCode: string | undefined;
+      let errorDetails: Record<string, unknown> | undefined;
 
       try {
         const errorBody = (await response.json()) as {
           message?: string;
-          error?: { message?: string; code?: string } | string;
+          error?: { message?: string; code?: string; details?: Record<string, unknown> } | string;
           code?: string;
         };
         // API sends { error: { code, message } }; fall back to flat shapes
@@ -125,6 +129,7 @@ export class AgentMailboxClient {
           (typeof errorBody.error === 'string' ? errorBody.error : undefined) ??
           response.statusText;
         errorCode = errorBody.code ?? nested?.code;
+        errorDetails = nested?.details;
       } catch {
         errorMessage = response.statusText;
       }
@@ -134,6 +139,8 @@ export class AgentMailboxClient {
           throw new BadRequestError(errorMessage);
         case 401:
           throw new UnauthorizedError(errorMessage);
+        case 402:
+          throw new PaymentRequiredError(errorMessage, (errorDetails ?? {}) as PaymentRequiredDetails);
         case 404:
           throw new NotFoundError(errorMessage);
         case 409:
@@ -143,6 +150,7 @@ export class AgentMailboxClient {
             errorMessage,
             response.status,
             errorCode ?? 'SERVER_ERROR',
+            errorDetails,
           );
       }
     }
@@ -301,11 +309,20 @@ export class AgentMailboxClient {
 
   readonly billing = {
     /**
-     * Get the agent's balance, deposit addresses, and pricing.
-     * Creates deposit addresses on first call if billing is configured.
+     * The wallet this agent spends from (its own, or its organisation's), its
+     * balance and standing, the three prices, and how to top up.
      */
     get: (): Promise<BillingInfo> =>
       this.request<BillingInfo>('GET', '/v1/billing'),
+
+    /**
+     * Create a Stripe Checkout link that tops up this agent's wallet (its
+     * organisation's, for an agent on an org domain). Give `url` to a human to
+     * pay by card; the balance is credited within seconds of payment. The
+     * minimum is `topup.minAmountUsd` from `get()`.
+     */
+    topup: (amountUsd: number): Promise<TopupResponse> =>
+      this.request<TopupResponse>('POST', '/v1/billing/topup', { amountUsd }),
 
     /**
      * List balance transactions (deposits and deductions), newest first.

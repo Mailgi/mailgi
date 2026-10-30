@@ -44,6 +44,7 @@ const s: Record<string, React.CSSProperties> = {
     alignSelf: "flex-start",
   },
   note: { fontSize: 11, color: "#555", lineHeight: 1.5 },
+  badge: { fontSize: 10, textTransform: "uppercase", letterSpacing: 0.8, border: "1px solid", borderRadius: 3, padding: "1px 6px" },
   error: { color: "#f87171", fontSize: 12 },
   loading: { color: "#555", fontSize: 13 },
   table: { width: "100%", borderCollapse: "collapse" as const, fontSize: 12 },
@@ -63,6 +64,21 @@ const s: Record<string, React.CSSProperties> = {
   },
 };
 
+const TX_LABELS: Record<string, string> = {
+  deposit: "Top-up", deduction: "Send", storage: "Storage", refund: "Refund", dispute: "Dispute",
+};
+
+const STANDING: Record<string, { label: string; fg: string }> = {
+  ok: { label: "OK", fg: "#7ecf7e" },
+  low_balance: { label: "Low balance", fg: "#e8c468" },
+  in_debt: { label: "In debt", fg: "#f2a0a0" },
+  reads_blocked: { label: "Reading paused", fg: "#ff8a8a" },
+};
+
+function money(n: number, dp = 2): string {
+  return `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(dp)}`;
+}
+
 interface Props {
   apiKey: string;
   baseUrl?: string;
@@ -74,7 +90,10 @@ export function Billing({ apiKey, baseUrl }: Props) {
   const [info, setInfo] = useState<BillingInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [copied, setCopied] = useState<"evm" | "sol" | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [amount, setAmount] = useState("10");
+  const [topupBusy, setTopupBusy] = useState(false);
+  const [topupError, setTopupError] = useState("");
 
   const [txData, setTxData] = useState<ListTransactionsResponse | null>(null);
   const [txPage, setTxPage] = useState(0);
@@ -115,11 +134,25 @@ export function Billing({ apiKey, baseUrl }: Props) {
     void loadTx(txPage);
   }, [loadTx, txPage]);
 
-  function copy(text: string, which: "evm" | "sol") {
+  function copy(text: string) {
     navigator.clipboard.writeText(text).then(() => {
-      setCopied(which);
-      setTimeout(() => setCopied(null), 1500);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     });
+  }
+
+  /** What an agent would do: create a Checkout link and hand it to a human. Here, open it. */
+  async function createPaymentLink() {
+    setTopupError("");
+    setTopupBusy(true);
+    try {
+      const { url } = await client.billing.topup(Number(amount));
+      window.open(url, "_blank", "noreferrer");
+    } catch (err) {
+      setTopupError(err instanceof Error ? err.message : "Could not create a payment link");
+    } finally {
+      setTopupBusy(false);
+    }
   }
 
   function formatDate(iso: string) {
@@ -137,49 +170,61 @@ export function Billing({ apiKey, baseUrl }: Props) {
   );
   if (!info) return null;
 
-  const { depositAddresses: addrs } = info;
   const totalPages = txData ? Math.ceil(txData.total / PAGE) : 0;
+  const p = info.prices;
+  const standing = STANDING[info.standing.status] ?? STANDING.ok;
 
   return (
     <div style={s.container}>
 
-      {/* Balance */}
+      {/* Balance and standing */}
       <div style={s.section}>
-        <div style={s.sectionTitle}>Balance</div>
-        <div style={s.balance}>${info.balanceUsd.toFixed(4)}</div>
-        <div style={s.balanceSub}>
-          ${info.pricePerExternalEmail.toFixed(3)} per external email ·{" "}
-          {Math.floor(info.balanceUsd / info.pricePerExternalEmail).toLocaleString()} sends remaining
+        <div style={s.sectionTitle}>
+          {info.wallet.kind === "org" ? "Organisation wallet (shared by its agents)" : "This agent's wallet"}
+        </div>
+        <div style={{ ...s.balance, ...(info.balanceUsd < 0 ? { color: "#f87171" } : {}) }}>{money(info.balanceUsd, 4)}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ ...s.badge, color: standing.fg, borderColor: standing.fg }}>{standing.label}</span>
+          <span style={s.balanceSub}>low-balance level {money(info.standing.lowBalanceUsd)} (about a week of spend)</span>
+        </div>
+        {info.standing.message && <div style={{ ...s.note, color: standing.fg }}>{info.standing.message}</div>}
+        {!info.meteringEnabled && <div style={s.note}>Metering is off on this server: nothing is charged yet.</div>}
+      </div>
+
+      {/* Prices */}
+      <div style={s.section}>
+        <div style={s.sectionTitle}>Prices</div>
+        <div style={s.note}>
+          ${p.outboundEmailUsd} per external recipient · +${p.introductionUsd} the first time (introduction) ·
+          ${p.storageGbMonthUsd} per GB-month above {Math.round(p.storageFreeBytes / 1048576)} MB.
+          Receiving and internal mail are free. {info.knownContacts} known contact{info.knownContacts === 1 ? "" : "s"}.
         </div>
       </div>
 
-      {/* Deposit addresses */}
+      {/* Top up */}
       <div style={s.section}>
-        <div style={s.sectionTitle}>Deposit USDC</div>
-        {!addrs ? (
-          <div style={s.note}>Billing not configured on server (BILLING_HD_MNEMONIC not set).</div>
+        <div style={s.sectionTitle}>Top up</div>
+        {!info.topup.available ? (
+          <div style={s.note}>Card payments are not configured on this server.</div>
         ) : (
           <>
-            <div style={s.note}>
-              {info.acceptedToken} only · 1 USDC = $1
-            </div>
             <div style={s.row}>
-              <div style={s.label}>EVM — Ethereum mainnet · Base</div>
+              <div style={s.label}>Public page: anyone can pay, no login (what agents forward)</div>
               <div style={s.addrRow}>
-                <div style={s.addr}>{addrs.evm}</div>
-                <button style={s.copyBtn} onClick={() => copy(addrs.evm, "evm")}>
-                  {copied === "evm" ? "Copied!" : "Copy"}
-                </button>
+                <a style={{ ...s.addr, color: "#7ab8ff" }} href={info.topup.publicPage} target="_blank" rel="noreferrer">{info.topup.publicPage}</a>
+                <button style={s.copyBtn} onClick={() => copy(info.topup.publicPage)}>{copied ? "Copied!" : "Copy"}</button>
               </div>
             </div>
             <div style={s.row}>
-              <div style={s.label}>Solana mainnet</div>
+              <div style={s.label}>Or create a card payment link (POST /v1/billing/topup), min ${info.topup.minAmountUsd}</div>
               <div style={s.addrRow}>
-                <div style={s.addr}>{addrs.solana}</div>
-                <button style={s.copyBtn} onClick={() => copy(addrs.solana, "sol")}>
-                  {copied === "sol" ? "Copied!" : "Copy"}
+                <input style={{ ...s.addr, flex: "0 0 90px" }} type="number" min={info.topup.minAmountUsd} value={amount}
+                  onChange={(e) => setAmount(e.target.value)} aria-label="Amount in US dollars" />
+                <button style={s.copyBtn} disabled={topupBusy || Number(amount) < info.topup.minAmountUsd} onClick={() => void createPaymentLink()}>
+                  {topupBusy ? "Creating…" : "Open payment link ↗"}
                 </button>
               </div>
+              {topupError && <div style={s.error}>{topupError}</div>}
             </div>
           </>
         )}
@@ -207,15 +252,16 @@ export function Billing({ apiKey, baseUrl }: Props) {
                 {txData.transactions.map((tx) => (
                   <tr key={tx.id}>
                     <td style={s.td}>{formatDate(tx.createdAt)}</td>
-                    <td style={s.td}>{tx.type === "deposit" ? "Deposit" : "Send"}</td>
-                    <td style={{ ...s.td, textAlign: "right", fontFamily: "monospace", ...( tx.type === "deposit" ? s.deposit : s.deduction) }}>
-                      {tx.type === "deposit" ? "+" : "−"}${Math.abs(tx.amountUsd).toFixed(4)}
+                    <td style={s.td}>{TX_LABELS[tx.type] ?? tx.type}</td>
+                    <td style={{ ...s.td, textAlign: "right", fontFamily: "monospace", ...(tx.amountUsd >= 0 ? s.deposit : s.deduction) }}>
+                      {tx.amountUsd >= 0 ? "+" : "−"}${Math.abs(tx.amountUsd).toFixed(4)}
                     </td>
                     <td style={{ ...s.td, color: "#555", fontSize: 11 }}>
-                      {tx.type === "deposit" && tx.chain ? tx.chain : ""}
-                      {tx.type === "deduction" && tx.emailCount != null
-                        ? `${tx.emailCount} recipient${tx.emailCount !== 1 ? "s" : ""}`
-                        : ""}
+                      {tx.emailCount != null
+                        ? `${tx.emailCount} recipient${tx.emailCount !== 1 ? "s" : ""}${tx.introductionCount ? `, ${tx.introductionCount} new` : ""}`
+                        : tx.type === "storage" && tx.providerRef
+                          ? `day ${tx.providerRef.split(":").pop()}`
+                          : tx.provider === "stripe" ? "card" : tx.chain ?? ""}
                     </td>
                   </tr>
                 ))}

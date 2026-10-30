@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { makeClient } from "../lib/client.js";
-import type { Email, EmailWithBody, Mailbox } from "@mailgi/mailgi";
+import { PaymentRequiredError, type BillingNotice, type Email, type EmailWithBody, type Mailbox } from "@mailgi/mailgi";
+import { BillingBanner, ReadsBlocked } from "./BillingBanner.js";
 
 const s: Record<string, React.CSSProperties> = {
   container: { display: "flex", flex: 1, overflow: "hidden" },
@@ -57,6 +58,20 @@ export function Inbox({ apiKey, baseUrl }: Props) {
   const [selected, setSelected] = useState<Email | null>(null);
   const [fullMessage, setFullMessage] = useState<EmailWithBody | null>(null);
   const [loading, setLoading] = useState(false);
+  // The wallet's notice from the latest read, and a read block (402
+  // debt_limit) when the API refuses reads. Both come from the API as-is.
+  const [billing, setBilling] = useState<BillingNotice | null>(null);
+  const [blocked, setBlocked] = useState<PaymentRequiredError | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  /** True when the error was the read block, which is then shown instead of the inbox. */
+  function caughtBlock(err: unknown): boolean {
+    if (err instanceof PaymentRequiredError && err.readsBlocked) {
+      setBlocked(err);
+      return true;
+    }
+    return false;
+  }
 
   // Load mailboxes once per agent key, auto-select Inbox
   useEffect(() => {
@@ -71,13 +86,14 @@ export function Inbox({ apiKey, baseUrl }: Props) {
         if (cancelled) return;
         setMailboxes(sorted);
         const inbox = sorted.find((m) => m.role === "inbox");
+        setBlocked(null);
         setActiveMailboxId(inbox?.id ?? sorted[0]?.id ?? null);
-      } catch {
-        // ignore
+      } catch (err) {
+        if (!cancelled) caughtBlock(err);
       }
     })();
     return () => { cancelled = true; };
-  }, [apiKey]);
+  }, [apiKey, reloadKey]);
 
   const loadMessages = useCallback(async (mailboxId: string | null) => {
     if (!mailboxId) return;
@@ -88,7 +104,9 @@ export function Inbox({ apiKey, baseUrl }: Props) {
       const client = makeClient(apiKey, baseUrl);
       const result = await client.mail.list({ mailboxId, limit: 50 });
       setMessages(result.messages ?? []);
-    } catch {
+      setBilling(result.billing ?? null);
+    } catch (err) {
+      caughtBlock(err);
       setMessages([]);
     } finally {
       setLoading(false);
@@ -110,13 +128,15 @@ export function Inbox({ apiKey, baseUrl }: Props) {
       const client = makeClient(apiKey, baseUrl);
       const full = await client.mail.get(msg.id);
       setFullMessage(full);
+      setBilling(full.billing ?? null);
       if (!msg.seen) {
         await client.mail.setFlags(msg.id, { seen: true }).catch(() => {});
         setMessages((prev) =>
           prev.map((m) => (m.id === msg.id ? { ...m, seen: true } : m)),
         );
       }
-    } catch {
+    } catch (err) {
+      if (caughtBlock(err)) return;
       setFullMessage(msg);
     }
   }
@@ -156,7 +176,18 @@ export function Inbox({ apiKey, baseUrl }: Props) {
 
   const activeBox = mailboxes.find((m) => m.id === activeMailboxId);
 
+  if (blocked) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+        <BillingBanner error={blocked} />
+        <ReadsBlocked error={blocked} onRetry={() => { setBlocked(null); setReloadKey((k) => k + 1); loadMessages(activeMailboxId); }} />
+      </div>
+    );
+  }
+
   return (
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+    <BillingBanner notice={billing} />
     <div style={s.container}>
       {/* Mailbox sidebar */}
       <div style={s.sidebar}>
@@ -238,6 +269,7 @@ export function Inbox({ apiKey, baseUrl }: Props) {
           </>
         )}
       </div>
+    </div>
     </div>
   );
 }

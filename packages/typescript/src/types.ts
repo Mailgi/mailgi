@@ -96,11 +96,41 @@ export interface JmapBodyValue {
   isTruncated?: boolean;
 }
 
+/**
+ * How the wallet is doing (`GET /v1/billing` → `standing`, and the `billing`
+ * notice on reads and sends).
+ *
+ * - `ok`: nothing to do
+ * - `low_balance`: below about a week of this wallet's own spend (at least $1)
+ * - `in_debt`: negative; mail to outside addresses is refused (402)
+ * - `reads_blocked`: an agent wallet more than `lowBalanceUsd` in debt; reads
+ *   answer 402 with `reason: "debt_limit"` until topped up. Receiving,
+ *   webhooks, deleting and billing keep working.
+ */
+export type StandingStatus = 'ok' | 'low_balance' | 'in_debt' | 'reads_blocked';
+
+/**
+ * Attached to `mail.list()`, `mail.get()` and `mail.send()` results while the
+ * wallet needs attention. Absent means the balance is fine. When present,
+ * forward `topupPage` to whoever pays for the agent.
+ */
+export interface BillingNotice {
+  status: Exclude<StandingStatus, 'ok'>;
+  balanceUsd: number;
+  /** About one week of this wallet's spend, never less than $1. */
+  lowBalanceUsd: number;
+  /** Public top-up page with this agent's address filled in. No login needed to pay. */
+  topupPage: string;
+  message: string;
+}
+
 export interface EmailWithBody extends Email {
   htmlBody?: string | JmapBodyPart[];
   textBody?: string | JmapBodyPart[];
   /** JMAP body part map: partId → body value */
   bodyValues?: Record<string, JmapBodyValue>;
+  /** Present only while the wallet needs attention. */
+  billing?: BillingNotice;
 }
 
 export interface ListMailOptions {
@@ -114,6 +144,8 @@ export interface ListMailResponse {
   messages: Email[];
   total: number;
   position: number;
+  /** Present only while the wallet needs attention. */
+  billing?: BillingNotice;
 }
 
 export interface SendMailRequest {
@@ -128,6 +160,8 @@ export interface SendMailRequest {
 
 export interface SendMailResponse {
   messageId: string;
+  /** Present when this send left the wallet low or in debt. */
+  billing?: BillingNotice;
 }
 
 // --- Mailboxes ---
@@ -155,30 +189,109 @@ export interface HealthResponse {
 }
 
 // --- Billing ---
+/** Whose money pays: the agent's own wallet, or its organisation's. */
+export interface Wallet {
+  kind: 'agent' | 'org';
+  id: string;
+}
+
+export interface Prices {
+  /** Per external recipient, every send. */
+  outboundEmailUsd: number;
+  /** Added once for a recipient that has never written to this agent. */
+  introductionUsd: number;
+  /** Per GB-month of mailbox storage, billed daily. */
+  storageGbMonthUsd: number;
+  /** Free storage per mailbox, in bytes. */
+  storageFreeBytes: number;
+}
+
+export interface BillingInfo {
+  wallet: Wallet;
+  /** Can be negative (storage charged while empty, or a card refund). */
+  balanceUsd: number;
+  /** False when this deployment does not charge yet. */
+  meteringEnabled: boolean;
+  prices: Prices;
+  /** External addresses this agent has corresponded with (no introduction fee). */
+  knownContacts: number;
+  standing: {
+    status: StandingStatus;
+    lowBalanceUsd: number;
+    /** What to do; absent when `ok`. */
+    message?: string;
+  };
+  topup: {
+    /** `POST /v1/billing/topup`: see `billing.topup()`. */
+    endpoint: string;
+    /** Public page, this agent's address filled in; forward it to whoever pays. */
+    publicPage: string;
+    method: string;
+    minAmountUsd: number;
+    /** False when card payments are not configured on this deployment. */
+    available: boolean;
+  };
+  /** @deprecated Legacy USDC deposits; null unless crypto billing is configured. */
+  depositAddresses?: DepositAddresses | null;
+  /** @deprecated Legacy USDC deposits. */
+  acceptedToken?: string;
+  /** @deprecated Legacy USDC deposits. */
+  networks?: { evm: string[]; solana: string[] };
+}
+
+/** @deprecated Legacy USDC deposits. */
 export interface DepositAddresses {
   evm: string;
   solana: string;
 }
 
-export interface BillingInfo {
-  balanceUsd: number;
-  depositAddresses: DepositAddresses | null;
-  pricePerExternalEmail: number;
-  acceptedToken: string;
-  networks: {
-    evm: string[];
-    solana: string[];
-  };
+export interface TopupResponse {
+  /** Stripe Checkout URL. Give it to a human to pay by card; no Mailgi login needed. */
+  url: string;
+  sessionId: string;
+  amountUsd: number;
+  wallet: Wallet;
 }
 
 export interface BalanceTransaction {
   id: string;
-  type: 'deposit' | 'deduction';
+  /** Negative amounts are charges; `deposit` is a top-up; `refund`/`dispute` reverse one. */
+  type: 'deposit' | 'deduction' | 'storage' | 'refund' | 'dispute';
   amountUsd: number;
-  txHash: string | null;
-  chain: string | null;
+  /** The agent that incurred the charge (org wallets list every agent's). */
+  agentId: string | null;
+  /** External recipients billed, for `deduction`. */
   emailCount: number | null;
+  /** Of those, first-contact recipients. */
+  introductionCount: number | null;
+  provider: string | null;
+  providerRef: string | null;
+  /** @deprecated Legacy USDC deposits. */
+  txHash: string | null;
+  /** @deprecated Legacy USDC deposits. */
+  chain: string | null;
   createdAt: string;
+}
+
+/** `error.details` of a 402 `PAYMENT_REQUIRED`. */
+export interface PaymentRequiredDetails {
+  [key: string]: unknown;
+  /** `debt_limit` when reading is paused; absent for a send the wallet cannot cover. */
+  reason?: 'debt_limit';
+  wallet?: Wallet;
+  balanceUsd?: number;
+  /** The least top-up that makes the request succeed. */
+  requiredUsd?: number;
+  /** Public top-up page with the agent's address filled in. */
+  topupPage?: string;
+  /** For `debt_limit`: reads resume at or above this balance. */
+  debtLimitUsd?: number;
+  /** For a refused send. */
+  outboundRecipients?: number;
+  unknownRecipients?: string[];
+  pricePerOutboundEmailUsd?: number;
+  pricePerIntroductionUsd?: number;
+  topupEndpoint?: string;
 }
 
 export interface ListTransactionsOptions {
@@ -238,18 +351,13 @@ export interface ListWebhookEndpointsResponse {
   endpoints: WebhookEndpoint[];
 }
 
-export interface WebhookAttachment {
-  name: string | null;
-  size: number | null;
-  type: string | null;
-}
-
 /**
- * The body Mailgi POSTs to a webhook endpoint when mail arrives.
+ * The body Mailgi POSTs to a webhook endpoint when mail arrives: a thin event.
  *
- * Envelope fields are always present. `subject`, `preview`, `attachments` and
- * `fetchUrl` come from a message-enrichment step that **fails soft**, so treat
- * them as optional rather than assuming they are populated.
+ * No subject, preview, body or attachment names -- read the message with
+ * `mail.get()` (or `fetchUrl` with the API key). That keeps mail content out
+ * of your endpoint's logs. `fetchUrl` comes from a lookup that fails soft, so
+ * it can be null; everything else is always present.
  */
 export interface InboundMailNotification {
   event: 'mail.received';
@@ -259,11 +367,10 @@ export interface InboundMailNotification {
   from: string | null;
   to: string[];
   receivedAt: string;
-  subject: string | null;
-  /** Short plain-text snippet. Never the full body. */
-  preview: string | null;
-  attachments: WebhookAttachment[];
-  /** Absolute URL for fetching the full message, or null if enrichment failed. */
+  size: number | null;
+  /** The spam filter flagged it. You are notified either way. */
+  spam: boolean;
+  /** `GET /v1/mail/<id>` for this message, or null if the lookup failed. */
   fetchUrl: string | null;
 }
 

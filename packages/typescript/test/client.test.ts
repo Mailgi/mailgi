@@ -5,6 +5,7 @@ import {
   BadRequestError,
   ConflictError,
   NotFoundError,
+  PaymentRequiredError,
   UnauthorizedError,
 } from '../src/errors.js';
 import type {
@@ -115,12 +116,17 @@ const API_KEY: ApiKey = {
   revokedAt: null,
 };
 
+const TOPUP_PAGE = 'https://app.mailgi.xyz/topup?address=bot%40mailgi.xyz';
+
 const BILLING: BillingInfo = {
+  wallet: { kind: 'agent', id: 'agent_1' },
   balanceUsd: 1.5,
-  depositAddresses: { evm: '0xABC', solana: 'GF4A' },
-  pricePerExternalEmail: 0.005,
-  acceptedToken: 'USDC',
-  networks: { evm: ['Ethereum mainnet', 'Base'], solana: ['Solana mainnet'] },
+  meteringEnabled: true,
+  prices: { outboundEmailUsd: 0.0005, introductionUsd: 0.02, storageGbMonthUsd: 0.25, storageFreeBytes: 10485760 },
+  knownContacts: 3,
+  standing: { status: 'ok', lowBalanceUsd: 1 },
+  topup: { endpoint: 'POST /v1/billing/topup', publicPage: TOPUP_PAGE, method: 'stripe_checkout', minAmountUsd: 5, available: true },
+  depositAddresses: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -372,8 +378,64 @@ describe('AgentMailboxClient', () => {
       vi.stubGlobal('fetch', makeFetch(200, BILLING));
       const result = await makeClient().billing.get();
       expect(result.balanceUsd).toBe(1.5);
-      expect(result.depositAddresses?.evm).toBe('0xABC');
+      expect(result.wallet.kind).toBe('agent');
+      expect(result.standing.status).toBe('ok');
+      expect(result.topup.publicPage).toBe(TOPUP_PAGE);
       expect(lastCall()[0]).toBe(`${BASE}/v1/billing`);
+    });
+  });
+
+  describe('billing.topup', () => {
+    it('POSTs the amount and returns the Checkout URL', async () => {
+      vi.stubGlobal('fetch', makeFetch(201, { url: 'https://checkout.stripe.com/c/pay/cs_1', sessionId: 'cs_1', amountUsd: 10, wallet: { kind: 'agent', id: 'agent_1' } }));
+      const result = await makeClient().billing.topup(10);
+      expect(result.url).toBe('https://checkout.stripe.com/c/pay/cs_1');
+      const [url, init] = lastCall();
+      expect(url).toBe(`${BASE}/v1/billing/topup`);
+      expect(init.method).toBe('POST');
+      expect(JSON.parse(init.body as string)).toEqual({ amountUsd: 10 });
+    });
+  });
+
+  describe('billing notice and 402', () => {
+    const notice = {
+      status: 'low_balance' as const, balanceUsd: 0.4, lowBalanceUsd: 1, topupPage: TOPUP_PAGE,
+      message: 'Balance is low for this mailbox. Ask whoever pays for you to top up: ' + TOPUP_PAGE,
+    };
+
+    it('passes the billing notice through on list', async () => {
+      vi.stubGlobal('fetch', makeFetch(200, { messages: [], total: 0, position: 0, billing: notice }));
+      const result = await makeClient().mail.list();
+      expect(result.billing?.status).toBe('low_balance');
+      expect(result.billing?.topupPage).toBe(TOPUP_PAGE);
+    });
+
+    it('a debt-limit 402 is a PaymentRequiredError carrying the details', async () => {
+      vi.stubGlobal('fetch', makeFetch(402, {
+        error: {
+          code: 'PAYMENT_REQUIRED',
+          message: 'Balance -$1.50 is past the debt limit (-$1.00)',
+          details: { reason: 'debt_limit', balanceUsd: -1.5, debtLimitUsd: -1, requiredUsd: 0.5, topupPage: TOPUP_PAGE },
+        },
+      }));
+      const err = await makeClient().mail.list().catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(PaymentRequiredError);
+      const pre = err as PaymentRequiredError;
+      expect(pre.statusCode).toBe(402);
+      expect(pre.code).toBe('PAYMENT_REQUIRED');
+      expect(pre.readsBlocked).toBe(true);
+      expect(pre.details.requiredUsd).toBe(0.5);
+      expect(pre.details.topupPage).toBe(TOPUP_PAGE);
+    });
+
+    it('a refused send is a PaymentRequiredError that is not a read block', async () => {
+      vi.stubGlobal('fetch', makeFetch(402, {
+        error: { code: 'PAYMENT_REQUIRED', message: 'costs $0.0205', details: { requiredUsd: 0.0205, unknownRecipients: ['x@example.com'] } },
+      }));
+      const err = (await makeClient().mail.send({ to: 'x@example.com', subject: 's', textBody: 't' }).catch((e: unknown) => e)) as PaymentRequiredError;
+      expect(err).toBeInstanceOf(PaymentRequiredError);
+      expect(err.readsBlocked).toBe(false);
+      expect(err.details.unknownRecipients).toEqual(['x@example.com']);
     });
   });
 

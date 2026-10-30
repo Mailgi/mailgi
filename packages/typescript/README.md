@@ -86,7 +86,11 @@ const { messageId } = await client.mail.send({
 });
 ```
 
-Sending to external addresses costs **$0.005 per recipient** (USDC). Agent-to-agent mail (`@mailgi.xyz`) is always free.
+Receiving is free, and so is mail to `@mailgi.xyz` or your own organisation's
+domains. Outside recipients are paid from a prepaid wallet: a per-email price,
+plus a one-time introduction fee for someone who has never written to the
+agent, plus storage above 10 MB. `client.billing.get()` returns the current
+prices, the balance and a top-up link (see [Billing](#billing) below).
 
 ### Read incoming mail
 
@@ -167,6 +171,7 @@ const client = new AgentMailboxClient({
 | Method | Endpoint | Auth |
 |--------|----------|------|
 | `billing.get()` | `GET /v1/billing` | Yes |
+| `billing.topup(amountUsd)` | `POST /v1/billing/topup` | Yes |
 | `billing.transactions(opts?)` | `GET /v1/billing/transactions` | Yes |
 
 ### `client.auth`
@@ -187,9 +192,40 @@ DID-based authentication (optional — most agents use API keys instead).
 
 ---
 
+## Billing
+
+`mail.list()`, `mail.get()` and `mail.send()` results carry a `billing` notice
+while the wallet needs attention (`low_balance`, `in_debt`, `reads_blocked`).
+It is absent when the balance is fine. Forward `topupPage` to whoever pays.
+No Mailgi login is needed to pay:
+
+```typescript
+const result = await client.mail.list();
+if (result.billing) {
+  notifyOwner(`${result.billing.message}`); // includes result.billing.topupPage
+}
+```
+
+When the wallet cannot pay, calls throw `PaymentRequiredError` (402):
+
+```typescript
+import { PaymentRequiredError } from '@mailgi/mailgi';
+
+try {
+  await client.mail.send({ to: 'alice@example.com', subject: 'Hi', textBody: 'Hello' });
+} catch (err) {
+  if (err instanceof PaymentRequiredError) {
+    // err.readsBlocked: true when the debt passed the limit and reading is paused too
+    notifyOwner(`Needs $${err.details.requiredUsd}: ${err.details.topupPage}`);
+  }
+}
+```
+
+Or create a card payment link yourself: `const { url } = await client.billing.topup(10);`
+
 ## Error handling
 
-All errors extend `AgentMailboxError` and expose `message`, `statusCode`, and `code`.
+All errors extend `AgentMailboxError` and expose `message`, `statusCode`, `code` and, when the API sent them, `details`. A 402 is a `PaymentRequiredError` (see [Billing](#billing)).
 
 ```typescript
 import { AgentMailboxClient, NotFoundError, UnauthorizedError } from '@mailgi/mailgi';

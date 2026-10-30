@@ -15,6 +15,7 @@ export {
   BadRequestError,
   ConflictError,
   NotFoundError,
+  PaymentRequiredError,
   UnauthorizedError,
 } from './errors.js';
 
@@ -23,7 +24,13 @@ export type {
   ApiKey,
   BalanceTransaction,
   BillingInfo,
+  BillingNotice,
   DepositAddresses,
+  PaymentRequiredDetails,
+  Prices,
+  StandingStatus,
+  TopupResponse,
+  Wallet,
   ListTransactionsOptions,
   ListTransactionsResponse,
   ChallengeResponse,
@@ -51,6 +58,5 @@ export type {
   WebhookEndpoint,
   WebhookDelivery,
   ListWebhookDeliveriesResponse,
-  WebhookAttachment,
   InboundMailNotification,
 } from './types.js';

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { PaymentRequiredError, type BillingNotice } from "@mailgi/mailgi";
+import { BillingBanner } from "./BillingBanner.js";
 import { makeClient } from "../lib/client.js";
 
 const s: Record<string, React.CSSProperties> = {
@@ -51,25 +53,37 @@ export function Compose({ apiKey, fromAddress, baseUrl }: Props) {
   const [body, setBody] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState<BillingNotice | null>(null);
+  const [paymentError, setPaymentError] = useState<PaymentRequiredError | null>(null);
 
   async function send() {
     setStatus("sending");
     setError("");
+    setPaymentError(null);
     try {
       const client = makeClient(apiKey, baseUrl);
-      await client.mail.send({ to, subject, textBody: body });
+      const result = await client.mail.send({ to, subject, textBody: body });
+      setNotice(result.billing ?? null);
       setStatus("sent");
       setTo("");
       setSubject("");
       setBody("");
       setTimeout(() => setStatus("idle"), 3000);
     } catch (err) {
+      if (err instanceof PaymentRequiredError) {
+        // Nothing was sent; the banner says why and links the top-up page.
+        setPaymentError(err);
+        setStatus("idle");
+        return;
+      }
       setError(err instanceof Error ? err.message : "Send failed");
       setStatus("error");
     }
   }
 
   return (
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "auto" }}>
+    <BillingBanner notice={paymentError ? null : notice} error={paymentError} />
     <div style={s.container}>
       <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>From: {fromAddress}</div>
 
@@ -98,6 +112,7 @@ export function Compose({ apiKey, fromAddress, baseUrl }: Props) {
 
       {status === "sent" && <div style={s.success}>Sent!</div>}
       {status === "error" && <div style={s.error}>{error}</div>}
+    </div>
     </div>
   );
 }

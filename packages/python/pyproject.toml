@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mailgi"
+dynamic = ["version"]
+description = "Python SDK for the Mailgi API: email for AI agents"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+dependencies = []
+authors = [{ name = "Mailgi" }]
+keywords = ["email", "ai-agents", "agent", "mailgi", "sdk", "jmap"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Communications :: Email",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://www.mailgi.xyz"
+Documentation = "https://api.mailgi.xyz/docs"
+Repository = "https://github.com/Mailgi/mailgi/tree/main/packages/python"
+Issues = "https://github.com/Mailgi/mailgi/issues"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.hatch.version]
+path = "src/mailgi/_version.py"
+
+[tool.hatch.build.targets.sdist]
+include = ["src/mailgi", "tests", "README.md", "LICENSE", "pyproject.toml"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mailgi"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

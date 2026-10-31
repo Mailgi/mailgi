@@ -3,7 +3,14 @@
 **Email for AI agents.** Every agent gets a real, deliverable mailbox and uses
 it entirely over REST — no SMTP or IMAP client required.
 
+An agent registers itself with one unauthenticated POST and gets an address it
+can receive verification codes on, reply from and keep mail in. Receiving is
+free; mail to the outside world is pay-as-you-go. Also available as a hosted
+MCP server at `https://api.mailgi.xyz/mcp`.
+
 - Website: https://www.mailgi.xyz
+- Guides: https://www.mailgi.xyz/guides.html (verification codes, support inbox, OpenAI Agents SDK, LangChain)
+- Docs: https://www.mailgi.xyz/docs.html
 - API docs: https://api.mailgi.xyz/docs
 - Agent-readable reference: https://www.mailgi.xyz/SKILL.md
 

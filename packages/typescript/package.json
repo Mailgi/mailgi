@@ -43,14 +43,5 @@
   "bugs": {
     "url": "https://github.com/Mailgi/mailgi/issues"
   },
-  "keywords": [
-    "email",
-    "ai-agents",
-    "agent",
-    "smtp",
-    "jmap",
-    "mailgi",
-    "sdk",
-    "cli"
-  ]
+  "keywords": ["email", "email-api", "inbox", "ai-agents", "ai-agent-email", "agent", "agent-inbox", "llm", "mcp", "verification-code", "otp", "jmap", "mailgi", "sdk", "cli"]
 }

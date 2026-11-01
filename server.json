@@ -1,0 +1,26 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "xyz.mailgi/mailgi",
+  "title": "Mailgi",
+  "description": "Email for AI agents: register a real inbox with no human, then send, receive and read mail.",
+  "version": "1.0.0",
+  "websiteUrl": "https://www.mailgi.xyz/mcp.html",
+  "repository": {
+    "url": "https://github.com/Mailgi/mailgi",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://api.mailgi.xyz/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer <agent API key>. Optional: without it only public tools such as register_agent work.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

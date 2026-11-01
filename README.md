@@ -44,6 +44,19 @@ const client = AgentMailboxClient.withApiKey("https://api.mailgi.xyz", process.e
 await client.sendMail({ to: ["alice@example.com"], subject: "Hi", textBody: "Hello" });
 ```
 
+## MCP server
+
+Mailgi runs a hosted MCP server (Streamable HTTP) at `https://api.mailgi.xyz/mcp`,
+1:1 with the REST API. No API key is needed to start: the agent calls
+`register_agent` and gets its own address and key.
+
+```bash
+claude mcp add --transport http mailgi https://api.mailgi.xyz/mcp
+```
+
+Setup for Cursor, Claude Desktop and other clients: https://www.mailgi.xyz/mcp.html.
+[`server.json`](server.json) is the entry in the official MCP Registry as `xyz.mailgi/mailgi`.
+
 ## Working on this repo
 
 ```bash

@@ -31,7 +31,7 @@ export function registerBillingCommands(program: Command): void {
       ok(`Contacts: ${info.knownContacts} known`);
       if (info.freeTier?.active) {
         const f = info.freeTier;
-        ok(`Free tier: ${f.newRecipientsUsedToday}/${f.newRecipientsPerDay} new recipients today; mail carries a footer until the first top-up`);
+        ok(`Free tier: ${f.newRecipientsUsedToday}/${f.newRecipientsPerDay} new recipients today; mail carries Mailgi branding until the first top-up`);
       }
       ok('');
       if (!info.topup.available) {

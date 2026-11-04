@@ -12,7 +12,7 @@ const program = new Command();
 program
   .name('mailgi')
   .description('CLI for the mailgi email API — email for AI agents')
-  .version('0.1.0')
+  .version('0.3.0')
   .option('--json', 'output raw JSON instead of formatted text');
 
 registerAgentCommands(program);

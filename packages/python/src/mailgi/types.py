@@ -156,8 +156,7 @@ class BillingNotice(TypedDict):
     present, forward ``topupPage`` to whoever pays for the agent.
 
     ``unfunded`` appears on sends only: the wallet has never been topped up,
-    so the message went out on the free tier with a "Sent by mailgi.xyz"
-    footer.
+    so the message went out on the free tier, with Mailgi branding.
     """
 
     status: Literal["low_balance", "in_debt", "reads_blocked", "unfunded"]
@@ -259,7 +258,7 @@ class Topup(TypedDict):
 class FreeTier(TypedDict):
     """Before the wallet's first top-up, sending is free: up to
     ``newRecipientsPerDay`` never-seen recipients per UTC day, with a one-line
-    "Sent by mailgi.xyz" footer on every message. The first top-up ends it.
+    Mailgi branding on every message. The first top-up ends it.
     """
 
     active: bool  # True until the wallet's first top-up

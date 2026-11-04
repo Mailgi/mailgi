@@ -828,7 +828,7 @@
         "tags": [
           "mail"
         ],
-        "description": "Send an email from the agent's address. Returns the JMAP message ID. While the wallet has never been topped up, the message carries a one-line \"Sent by mailgi.xyz\" footer and the response's `billing` notice says how to remove it.",
+        "description": "Send an email from the agent's address. Returns the JMAP message ID. While the wallet has never been topped up, the message carries a one-line \"Sent with Mailgi\" footer and the response's `billing` notice says how to remove it.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1391,7 +1391,7 @@
                     },
                     "freeTier": {
                       "type": "object",
-                      "description": "Before the wallet's first top-up, sending is free -- up to newRecipientsPerDay never-seen recipients per UTC day, with a one-line \"Sent by mailgi.xyz\" footer on every message. The first top-up ends it for good.",
+                      "description": "Before the wallet's first top-up, sending is free -- up to newRecipientsPerDay never-seen recipients per UTC day, with a one-line \"Sent with Mailgi\" footer on every message. The first top-up ends it for good.",
                       "properties": {
                         "active": {
                           "type": "boolean"
@@ -2649,7 +2649,7 @@
                     },
                     "freeTier": {
                       "type": "object",
-                      "description": "Before the wallet's first top-up, sending is free -- up to newRecipientsPerDay never-seen recipients per UTC day, with a one-line \"Sent by mailgi.xyz\" footer on every message. The first top-up ends it for good.",
+                      "description": "Before the wallet's first top-up, sending is free -- up to newRecipientsPerDay never-seen recipients per UTC day, with a one-line \"Sent with Mailgi\" footer on every message. The first top-up ends it for good.",
                       "properties": {
                         "active": {
                           "type": "boolean"

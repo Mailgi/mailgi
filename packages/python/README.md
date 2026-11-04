@@ -94,8 +94,8 @@ To create a card payment link yourself: `client.billing.topup(10)["url"]`.
 ### Free tier
 
 Until the wallet's first top-up, sending is free to up to 50 never-seen
-recipients per UTC day, and every message carries a one-line "Sent by
-mailgi.xyz" footer. Each such send returns a `billing` notice with status
+recipients per UTC day, and every message carries Mailgi
+branding. Each such send returns a `billing` notice with status
 `unfunded`. `client.billing.get()["freeTier"]` reports where the wallet stands.
 The first top-up ends the free tier.
 

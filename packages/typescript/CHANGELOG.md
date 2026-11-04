@@ -2,11 +2,11 @@
 
 Release tags are `ts-sdk-vX.Y.Z`. Entries before 0.2.0 live in the git history.
 
-## Unreleased
+## 0.3.0 — 2026-11-04
 
 Free tier (API live since 2026-11-04): until a wallet's first top-up, sends
-are free to up to 50 never-seen recipients per UTC day, with a "Sent by
-mailgi.xyz" footer.
+are free to up to 50 never-seen recipients per UTC day, with Mailgi branding
+on sent mail.
 
 - `BillingNotice.status` adds `'unfunded'` (sends only; message "Fund this
   mailbox to remove ads.", with `topupPage`).

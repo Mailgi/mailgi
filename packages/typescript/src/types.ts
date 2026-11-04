@@ -115,7 +115,7 @@ export type StandingStatus = 'ok' | 'low_balance' | 'in_debt' | 'reads_blocked';
  * forward `topupPage` to whoever pays for the agent.
  *
  * `unfunded` appears on sends only: the wallet has never been topped up, so
- * the message went out on the free tier with a "Sent by mailgi.xyz" footer.
+ * the message went out on the free tier with Mailgi branding on it.
  */
 export interface BillingNotice {
   status: Exclude<StandingStatus, 'ok'> | 'unfunded';
@@ -212,7 +212,7 @@ export interface Prices {
 /**
  * Before the wallet's first top-up, sending is free: up to
  * `newRecipientsPerDay` never-seen recipients per UTC day, with a one-line
- * "Sent by mailgi.xyz" footer on every message. The first top-up ends it.
+ * Mailgi branding on every message. The first top-up ends it.
  */
 export interface FreeTier {
   /** True until the wallet's first top-up. */

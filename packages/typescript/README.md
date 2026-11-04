@@ -228,8 +228,8 @@ Or create a card payment link yourself: `const { url } = await client.billing.to
 ### Free tier
 
 Until the wallet's first top-up, sending is free to up to 50 never-seen
-recipients per UTC day, and every message carries a one-line "Sent by
-mailgi.xyz" footer. Each such send returns a `billing` notice with status
+recipients per UTC day, and every message carries Mailgi
+branding. Each such send returns a `billing` notice with status
 `unfunded`. Past the cap, `mail.send()` throws `PaymentRequiredError` with
 `details.reason === 'free_tier_limit'` and `newRecipientsPerDay` /
 `newRecipientsUsedToday`. `client.billing.get()` reports where the wallet

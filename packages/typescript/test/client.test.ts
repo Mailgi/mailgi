@@ -124,6 +124,7 @@ const BILLING: BillingInfo = {
   meteringEnabled: true,
   prices: { outboundEmailUsd: 0.0005, introductionUsd: 0.02, storageGbMonthUsd: 0.25, storageFreeBytes: 10485760 },
   knownContacts: 3,
+  freeTier: { active: true, newRecipientsPerDay: 50, newRecipientsUsedToday: 7 },
   standing: { status: 'ok', lowBalanceUsd: 1 },
   topup: { endpoint: 'POST /v1/billing/topup', publicPage: TOPUP_PAGE, method: 'stripe_checkout', minAmountUsd: 5, available: true },
   depositAddresses: null,
@@ -381,6 +382,7 @@ describe('AgentMailboxClient', () => {
       expect(result.wallet.kind).toBe('agent');
       expect(result.standing.status).toBe('ok');
       expect(result.topup.publicPage).toBe(TOPUP_PAGE);
+      expect(result.freeTier).toEqual({ active: true, newRecipientsPerDay: 50, newRecipientsUsedToday: 7 });
       expect(lastCall()[0]).toBe(`${BASE}/v1/billing`);
     });
   });
@@ -435,7 +437,39 @@ describe('AgentMailboxClient', () => {
       const err = (await makeClient().mail.send({ to: 'x@example.com', subject: 's', textBody: 't' }).catch((e: unknown) => e)) as PaymentRequiredError;
       expect(err).toBeInstanceOf(PaymentRequiredError);
       expect(err.readsBlocked).toBe(false);
+      expect(err.freeTierLimit).toBe(false);
       expect(err.details.unknownRecipients).toEqual(['x@example.com']);
+    });
+
+    it('passes the unfunded notice through on a free-tier send', async () => {
+      vi.stubGlobal('fetch', makeFetch(201, {
+        messageId: 'm1',
+        billing: { status: 'unfunded', balanceUsd: 0, lowBalanceUsd: 1, topupPage: TOPUP_PAGE, message: 'Fund this mailbox to remove ads.' },
+      }));
+      const result = await makeClient().mail.send({ to: 'x@example.com', subject: 's', textBody: 't' });
+      expect(result.billing?.status).toBe('unfunded');
+      expect(result.billing?.topupPage).toBe(TOPUP_PAGE);
+    });
+
+    it('a free-tier cap 402 is a PaymentRequiredError with the daily counts', async () => {
+      vi.stubGlobal('fetch', makeFetch(402, {
+        error: {
+          code: 'PAYMENT_REQUIRED',
+          message: 'The free tier covers 50 new recipients a day, and this send would go past it.',
+          details: {
+            reason: 'free_tier_limit', wallet: { kind: 'agent', id: 'agent_1' }, outboundRecipients: 2,
+            unknownRecipients: ['x@example.com', 'y@example.com'], newRecipientsPerDay: 50, newRecipientsUsedToday: 49,
+            topupEndpoint: '/v1/billing/topup', topupPage: TOPUP_PAGE,
+          },
+        },
+      }));
+      const err = (await makeClient().mail.send({ to: ['x@example.com', 'y@example.com'], subject: 's', textBody: 't' }).catch((e: unknown) => e)) as PaymentRequiredError;
+      expect(err).toBeInstanceOf(PaymentRequiredError);
+      expect(err.freeTierLimit).toBe(true);
+      expect(err.readsBlocked).toBe(false);
+      expect(err.details.newRecipientsPerDay).toBe(50);
+      expect(err.details.newRecipientsUsedToday).toBe(49);
+      expect(err.details.topupPage).toBe(TOPUP_PAGE);
     });
   });
 

@@ -78,6 +78,7 @@ BILLING = {
     "meteringEnabled": True,
     "prices": {"outboundEmailUsd": 0.0005, "introductionUsd": 0.02, "storageGbMonthUsd": 0.25, "storageFreeBytes": 10485760},
     "knownContacts": 3,
+    "freeTier": {"active": True, "newRecipientsPerDay": 50, "newRecipientsUsedToday": 7},
     "standing": {"status": "ok", "lowBalanceUsd": 1},
     "topup": {"endpoint": "POST /v1/billing/topup", "publicPage": TOPUP_PAGE, "method": "stripe_checkout", "minAmountUsd": 5, "available": True},
     "depositAddresses": None,
@@ -271,6 +272,7 @@ def test_billing_get(respond):
     assert result["wallet"]["kind"] == "agent"
     assert result["standing"]["status"] == "ok"
     assert result["topup"]["publicPage"] == TOPUP_PAGE
+    assert result["freeTier"] == {"active": True, "newRecipientsPerDay": 50, "newRecipientsUsedToday": 7}
     assert t.url == f"{BASE}/v1/billing"
 
 
@@ -345,7 +347,43 @@ def test_refused_send_is_not_a_read_block(respond):
     with pytest.raises(PaymentRequiredError) as exc:
         client.mail.send(to="x@example.com", subject="s", text_body="t")
     assert exc.value.reads_blocked is False
+    assert exc.value.free_tier_limit is False
     assert exc.value.details["unknownRecipients"] == ["x@example.com"]
+
+
+def test_unfunded_notice_on_free_tier_send(respond):
+    notice = {**NOTICE, "status": "unfunded", "balanceUsd": 0, "message": "Fund this mailbox to remove ads."}
+    client, _ = respond(201, {"messageId": "m", "billing": notice})
+    billing = client.mail.send(to="a@example.com", subject="s", text_body="t")["billing"]
+    assert billing["status"] == "unfunded"
+    assert billing["topupPage"] == TOPUP_PAGE
+
+
+def test_free_tier_cap_402_carries_daily_counts(respond):
+    client, _ = respond(402, {
+        "error": {
+            "code": "PAYMENT_REQUIRED",
+            "message": "The free tier covers 50 new recipients a day, and this send would go past it.",
+            "details": {
+                "reason": "free_tier_limit",
+                "wallet": {"kind": "agent", "id": "agent_1"},
+                "outboundRecipients": 2,
+                "unknownRecipients": ["x@example.com", "y@example.com"],
+                "newRecipientsPerDay": 50,
+                "newRecipientsUsedToday": 49,
+                "topupEndpoint": "/v1/billing/topup",
+                "topupPage": TOPUP_PAGE,
+            },
+        },
+    })
+    with pytest.raises(PaymentRequiredError) as exc:
+        client.mail.send(to=["x@example.com", "y@example.com"], subject="s", text_body="t")
+    err = exc.value
+    assert err.free_tier_limit is True
+    assert err.reads_blocked is False
+    assert err.details["newRecipientsPerDay"] == 50
+    assert err.details["newRecipientsUsedToday"] == 49
+    assert err.details["topupPage"] == TOPUP_PAGE
 
 
 def test_402_without_details_has_empty_details(respond):

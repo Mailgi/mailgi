@@ -195,8 +195,9 @@ DID-based authentication (optional — most agents use API keys instead).
 ## Billing
 
 `mail.list()`, `mail.get()` and `mail.send()` results carry a `billing` notice
-while the wallet needs attention (`low_balance`, `in_debt`, `reads_blocked`).
-It is absent when the balance is fine. Forward `topupPage` to whoever pays.
+while the wallet needs attention (`low_balance`, `in_debt`, `reads_blocked`),
+and on a send from a wallet that was never topped up (`unfunded`). It is absent
+when the balance is fine. Forward `topupPage` to whoever pays.
 No Mailgi login is needed to pay:
 
 ```typescript
@@ -216,12 +217,23 @@ try {
 } catch (err) {
   if (err instanceof PaymentRequiredError) {
     // err.readsBlocked: true when the debt passed the limit and reading is paused too
+    // err.freeTierLimit: true when a free-tier send would pass today's cap on new recipients
     notifyOwner(`Needs $${err.details.requiredUsd}: ${err.details.topupPage}`);
   }
 }
 ```
 
 Or create a card payment link yourself: `const { url } = await client.billing.topup(10);`
+
+### Free tier
+
+Until the wallet's first top-up, sending is free to up to 50 never-seen
+recipients per UTC day, and every message carries a one-line "Sent by
+mailgi.xyz" footer. Each such send returns a `billing` notice with status
+`unfunded`. Past the cap, `mail.send()` throws `PaymentRequiredError` with
+`details.reason === 'free_tier_limit'` and `newRecipientsPerDay` /
+`newRecipientsUsedToday`. `client.billing.get()` reports where the wallet
+stands in `freeTier`. The first top-up ends the free tier.
 
 ## Error handling
 

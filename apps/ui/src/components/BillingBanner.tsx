@@ -10,6 +10,7 @@ const TONE: Record<string, { bg: string; border: string; fg: string; label: stri
   low_balance: { bg: "#1f1a0e", border: "#4a3b12", fg: "#e8c468", label: "Low balance" },
   in_debt: { bg: "#231313", border: "#4a1d1d", fg: "#f2a0a0", label: "In debt" },
   reads_blocked: { bg: "#2a1010", border: "#6b1d1d", fg: "#ff8a8a", label: "Reading paused" },
+  unfunded: { bg: "#13181f", border: "#1d2f4a", fg: "#9cc3f2", label: "Free tier" },
   payment_required: { bg: "#231313", border: "#4a1d1d", fg: "#f2a0a0", label: "Payment required" },
 };
 

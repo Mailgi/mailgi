@@ -650,14 +650,15 @@
                     },
                     "billing": {
                       "type": "object",
-                      "description": "Present only when the wallet needs attention: low_balance, in_debt, or reads_blocked. Absent means the balance is fine.",
+                      "description": "Present only when the wallet needs attention: low_balance, in_debt, or reads_blocked; or, on a send, unfunded (never topped up, so the mail carried the free-tier footer). Absent means the balance is fine.",
                       "properties": {
                         "status": {
                           "type": "string",
                           "enum": [
                             "low_balance",
                             "in_debt",
-                            "reads_blocked"
+                            "reads_blocked",
+                            "unfunded"
                           ]
                         },
                         "balanceUsd": {
@@ -827,7 +828,7 @@
         "tags": [
           "mail"
         ],
-        "description": "Send an email from the agent's address. Returns the JMAP message ID.",
+        "description": "Send an email from the agent's address. Returns the JMAP message ID. While the wallet has never been topped up, the message carries a one-line \"Sent by mailgi.xyz\" footer and the response's `billing` notice says how to remove it.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -903,14 +904,15 @@
                     },
                     "billing": {
                       "type": "object",
-                      "description": "Present only when the wallet needs attention: low_balance, in_debt, or reads_blocked. Absent means the balance is fine.",
+                      "description": "Present only when the wallet needs attention: low_balance, in_debt, or reads_blocked; or, on a send, unfunded (never topped up, so the mail carried the free-tier footer). Absent means the balance is fine.",
                       "properties": {
                         "status": {
                           "type": "string",
                           "enum": [
                             "low_balance",
                             "in_debt",
-                            "reads_blocked"
+                            "reads_blocked",
+                            "unfunded"
                           ]
                         },
                         "balanceUsd": {
@@ -935,11 +937,11 @@
             }
           },
           "402": {
-            "description": "The wallet (this agent's, or its organisation's) cannot cover the external recipients in this send. Nothing was sent. Drop recipients, or top up via POST /v1/billing/topup or the public top-up page, then retry.",
+            "description": "The wallet (this agent's, or its organisation's) cannot cover the external recipients in this send, or -- on the free tier, before the wallet's first top-up -- the send would go past the daily cap on new recipients (`reason: free_tier_limit`). Nothing was sent. Drop recipients, or top up via POST /v1/billing/topup or the public top-up page, then retry.",
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "The wallet (this agent's, or its organisation's) cannot cover the external recipients in this send. Nothing was sent. Drop recipients, or top up via POST /v1/billing/topup or the public top-up page, then retry.",
+                  "description": "The wallet (this agent's, or its organisation's) cannot cover the external recipients in this send, or -- on the free tier, before the wallet's first top-up -- the send would go past the daily cap on new recipients (`reason: free_tier_limit`). Nothing was sent. Drop recipients, or top up via POST /v1/billing/topup or the public top-up page, then retry.",
                   "type": "object",
                   "properties": {
                     "error": {
@@ -957,6 +959,13 @@
                         "details": {
                           "type": "object",
                           "properties": {
+                            "reason": {
+                              "type": "string",
+                              "enum": [
+                                "free_tier_limit"
+                              ],
+                              "description": "Present only for the free tier's daily cap"
+                            },
                             "wallet": {
                               "type": "object",
                               "properties": {
@@ -971,6 +980,14 @@
                                   "type": "string"
                                 }
                               }
+                            },
+                            "newRecipientsPerDay": {
+                              "type": "number",
+                              "description": "Free tier: never-seen recipients allowed per UTC day"
+                            },
+                            "newRecipientsUsedToday": {
+                              "type": "number",
+                              "description": "Free tier: of those, already used today"
                             },
                             "outboundRecipients": {
                               "type": "number",
@@ -1314,7 +1331,7 @@
         "tags": [
           "billing"
         ],
-        "description": "Returns the wallet this agent spends from (its own, or its organisation's), the balance, the three metered prices, how many contacts the agent already knows, and how to top up. Mail inside the organisation is never charged. `depositAddresses` is the legacy USDC path and is null unless crypto billing is configured.",
+        "description": "Returns the wallet this agent spends from (its own, or its organisation's), the balance, the three metered prices, the free tier (before the first top-up), how many contacts the agent already knows, and how to top up. Mail inside the organisation is never charged. `depositAddresses` is the legacy USDC path and is null unless crypto billing is configured.",
         "security": [
           {
             "bearerAuth": []
@@ -1369,6 +1386,21 @@
                         "storageFreeBytes": {
                           "type": "number",
                           "description": "Never billed, per mailbox"
+                        }
+                      }
+                    },
+                    "freeTier": {
+                      "type": "object",
+                      "description": "Before the wallet's first top-up, sending is free -- up to newRecipientsPerDay never-seen recipients per UTC day, with a one-line \"Sent by mailgi.xyz\" footer on every message. The first top-up ends it for good.",
+                      "properties": {
+                        "active": {
+                          "type": "boolean"
+                        },
+                        "newRecipientsPerDay": {
+                          "type": "number"
+                        },
+                        "newRecipientsUsedToday": {
+                          "type": "number"
                         }
                       }
                     },
@@ -2612,6 +2644,21 @@
                         "storageFreeBytes": {
                           "type": "number",
                           "description": "Never billed, per mailbox"
+                        }
+                      }
+                    },
+                    "freeTier": {
+                      "type": "object",
+                      "description": "Before the wallet's first top-up, sending is free -- up to newRecipientsPerDay never-seen recipients per UTC day, with a one-line \"Sent by mailgi.xyz\" footer on every message. The first top-up ends it for good.",
+                      "properties": {
+                        "active": {
+                          "type": "boolean"
+                        },
+                        "newRecipientsPerDay": {
+                          "type": "number"
+                        },
+                        "newRecipientsUsedToday": {
+                          "type": "number"
                         }
                       }
                     },

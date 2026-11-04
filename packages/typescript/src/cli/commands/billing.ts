@@ -29,6 +29,10 @@ export function registerBillingCommands(program: Command): void {
       ok(`Prices:   $${p.outboundEmailUsd} per external recipient, +$${p.introductionUsd} the first time,`);
       ok(`          $${p.storageGbMonthUsd} per GB-month above ${Math.round(p.storageFreeBytes / 1048576)} MB${info.meteringEnabled ? '' : '  (not charged yet)'}`);
       ok(`Contacts: ${info.knownContacts} known`);
+      if (info.freeTier?.active) {
+        const f = info.freeTier;
+        ok(`Free tier: ${f.newRecipientsUsedToday}/${f.newRecipientsPerDay} new recipients today; mail carries a footer until the first top-up`);
+      }
       ok('');
       if (!info.topup.available) {
         ok('Top-ups are not available on this server.');

@@ -82,11 +82,22 @@ except PaymentRequiredError as err:
 
 - A refused send sent nothing. `details` has `requiredUsd`, `unknownRecipients`
   (first-contact addresses) and the prices.
+- `free_tier_limit` is true when `details["reason"] == "free_tier_limit"`: a
+  free-tier send would pass today's cap on new recipients. Nothing was sent;
+  `details` has `newRecipientsPerDay` and `newRecipientsUsedToday`.
 - `reads_blocked` is true when `details["reason"] == "debt_limit"`. Reads
   resume once the balance is back at `debtLimitUsd`. Receiving, webhooks,
   deleting and billing keep working.
 
 To create a card payment link yourself: `client.billing.topup(10)["url"]`.
+
+### Free tier
+
+Until the wallet's first top-up, sending is free to up to 50 never-seen
+recipients per UTC day, and every message carries a one-line "Sent by
+mailgi.xyz" footer. Each such send returns a `billing` notice with status
+`unfunded`. `client.billing.get()["freeTier"]` reports where the wallet stands.
+The first top-up ends the free tier.
 
 ## Webhooks
 

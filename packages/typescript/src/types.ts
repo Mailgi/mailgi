@@ -113,9 +113,12 @@ export type StandingStatus = 'ok' | 'low_balance' | 'in_debt' | 'reads_blocked';
  * Attached to `mail.list()`, `mail.get()` and `mail.send()` results while the
  * wallet needs attention. Absent means the balance is fine. When present,
  * forward `topupPage` to whoever pays for the agent.
+ *
+ * `unfunded` appears on sends only: the wallet has never been topped up, so
+ * the message went out on the free tier with Mailgi branding on it.
  */
 export interface BillingNotice {
-  status: Exclude<StandingStatus, 'ok'>;
+  status: Exclude<StandingStatus, 'ok'> | 'unfunded';
   balanceUsd: number;
   /** About one week of this wallet's spend, never less than $1. */
   lowBalanceUsd: number;
@@ -160,7 +163,7 @@ export interface SendMailRequest {
 
 export interface SendMailResponse {
   messageId: string;
-  /** Present when this send left the wallet low or in debt. */
+  /** Present when this send left the wallet low or in debt, or went out on the free tier (`unfunded`). */
   billing?: BillingNotice;
 }
 
@@ -206,6 +209,19 @@ export interface Prices {
   storageFreeBytes: number;
 }
 
+/**
+ * Before the wallet's first top-up, sending is free: up to
+ * `newRecipientsPerDay` never-seen recipients per UTC day, with a one-line
+ * Mailgi branding on every message. The first top-up ends it.
+ */
+export interface FreeTier {
+  /** True until the wallet's first top-up. */
+  active: boolean;
+  newRecipientsPerDay: number;
+  /** Today's (UTC) new recipients so far; 0 once the free tier is over. */
+  newRecipientsUsedToday: number;
+}
+
 export interface BillingInfo {
   wallet: Wallet;
   /** Can be negative (storage charged while empty, or a card refund). */
@@ -215,6 +231,8 @@ export interface BillingInfo {
   prices: Prices;
   /** External addresses this agent has corresponded with (no introduction fee). */
   knownContacts: number;
+  /** Where the wallet stands on the free tier. Absent from servers older than this SDK. */
+  freeTier?: FreeTier;
   standing: {
     status: StandingStatus;
     lowBalanceUsd: number;
@@ -276,8 +294,12 @@ export interface BalanceTransaction {
 /** `error.details` of a 402 `PAYMENT_REQUIRED`. */
 export interface PaymentRequiredDetails {
   [key: string]: unknown;
-  /** `debt_limit` when reading is paused; absent for a send the wallet cannot cover. */
-  reason?: 'debt_limit';
+  /**
+   * `debt_limit` when reading is paused; `free_tier_limit` when a send on the
+   * free tier would pass the daily cap on new recipients; absent for a send
+   * the wallet cannot cover.
+   */
+  reason?: 'debt_limit' | 'free_tier_limit';
   wallet?: Wallet;
   balanceUsd?: number;
   /** The least top-up that makes the request succeed. */
@@ -292,6 +314,10 @@ export interface PaymentRequiredDetails {
   pricePerOutboundEmailUsd?: number;
   pricePerIntroductionUsd?: number;
   topupEndpoint?: string;
+  /** For `free_tier_limit`: never-seen recipients allowed per UTC day. */
+  newRecipientsPerDay?: number;
+  /** For `free_tier_limit`: of those, already used today. */
+  newRecipientsUsedToday?: number;
 }
 
 export interface ListTransactionsOptions {

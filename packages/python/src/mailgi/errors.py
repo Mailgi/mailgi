@@ -55,9 +55,10 @@ class ConflictError(MailgiError):
 class PaymentRequiredError(MailgiError):
     """402: the wallet cannot pay.
 
-    Either a send it cannot cover (nothing was sent), or
-    (``details["reason"] == "debt_limit"``) its debt is past the limit and
-    reading is paused. Forward ``details["topupPage"]`` to whoever pays, then
+    Either a send it cannot cover (nothing was sent); a free-tier send past
+    the daily cap on new recipients (``details["reason"] == "free_tier_limit"``,
+    nothing was sent); or (``details["reason"] == "debt_limit"``) its debt is
+    past the limit and reading is paused. Forward ``details["topupPage"]`` to whoever pays, then
     retry.
     """
 
@@ -74,6 +75,14 @@ class PaymentRequiredError(MailgiError):
     def reads_blocked(self) -> bool:
         """True when this is the read block, not a refused send."""
         return self.details.get("reason") == "debt_limit"
+
+    @property
+    def free_tier_limit(self) -> bool:
+        """True when a free-tier send would pass the daily cap on new recipients.
+
+        A top-up lifts it.
+        """
+        return self.details.get("reason") == "free_tier_limit"
 
 
 # Same names as the TypeScript SDK, for code ported from it.

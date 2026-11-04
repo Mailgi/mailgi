@@ -43,8 +43,10 @@ export class BadRequestError extends AgentMailboxError {
 
 /**
  * 402: the wallet cannot pay. Either a send it cannot cover (nothing was
- * sent), or (`details.reason === 'debt_limit'`) its debt is past the limit and
- * reading is paused. Forward `details.topupPage` to whoever pays, then retry.
+ * sent); a free-tier send past the daily cap on new recipients
+ * (`details.reason === 'free_tier_limit'`, nothing was sent); or
+ * (`details.reason === 'debt_limit'`) its debt is past the limit and reading
+ * is paused. Forward `details.topupPage` to whoever pays, then retry.
  */
 export class PaymentRequiredError extends AgentMailboxError {
   declare readonly details: PaymentRequiredDetails;
@@ -56,5 +58,10 @@ export class PaymentRequiredError extends AgentMailboxError {
   /** True when this is the read block, not a refused send. */
   get readsBlocked(): boolean {
     return this.details.reason === 'debt_limit';
+  }
+
+  /** True when a free-tier send would pass the daily cap on new recipients. A top-up lifts it. */
+  get freeTierLimit(): boolean {
+    return this.details.reason === 'free_tier_limit';
   }
 }

@@ -154,9 +154,12 @@ class BillingNotice(TypedDict):
     """Attached to ``mail.list()``, ``mail.get()`` and ``mail.send()`` results
     while the wallet needs attention. Absent means the balance is fine. When
     present, forward ``topupPage`` to whoever pays for the agent.
+
+    ``unfunded`` appears on sends only: the wallet has never been topped up,
+    so the message went out on the free tier, with Mailgi branding.
     """
 
-    status: Literal["low_balance", "in_debt", "reads_blocked"]
+    status: Literal["low_balance", "in_debt", "reads_blocked", "unfunded"]
     balanceUsd: float
     lowBalanceUsd: float  # About one week of this wallet's spend, never less than $1
     topupPage: str  # Public top-up page, this agent's address filled in. No login to pay.
@@ -185,7 +188,9 @@ class _SendMailResponse(TypedDict):
 
 
 class SendMailResponse(_SendMailResponse, total=False):
-    billing: BillingNotice  # Present when this send left the wallet low or in debt
+    # Present when this send left the wallet low or in debt, or went out on
+    # the free tier (`unfunded`)
+    billing: BillingNotice
 
 
 # --- Mailboxes ---------------------------------------------------------------
@@ -250,6 +255,17 @@ class Topup(TypedDict):
     available: bool  # False when card payments are not configured
 
 
+class FreeTier(TypedDict):
+    """Before the wallet's first top-up, sending is free: up to
+    ``newRecipientsPerDay`` never-seen recipients per UTC day, with a one-line
+    Mailgi branding on every message. The first top-up ends it.
+    """
+
+    active: bool  # True until the wallet's first top-up
+    newRecipientsPerDay: int
+    newRecipientsUsedToday: int  # Today's (UTC) so far; 0 once the free tier is over
+
+
 class _BillingInfo(TypedDict):
     wallet: Wallet
     balanceUsd: float  # Can be negative (storage charged while empty, or a refund)
@@ -261,6 +277,7 @@ class _BillingInfo(TypedDict):
 
 
 class BillingInfo(_BillingInfo, total=False):
+    freeTier: FreeTier  # Absent from servers older than this SDK
     # Legacy USDC deposits; deprecated. Null unless crypto billing is configured.
     depositAddresses: Optional[Dict[str, str]]
     acceptedToken: str
@@ -292,7 +309,10 @@ class BalanceTransaction(TypedDict):
 class PaymentRequiredDetails(TypedDict, total=False):
     """``error.details`` of a 402 ``PAYMENT_REQUIRED``. Every key is optional."""
 
-    reason: Literal["debt_limit"]  # Reading is paused; absent for a refused send
+    # `debt_limit`: reading is paused. `free_tier_limit`: a free-tier send would
+    # pass the daily cap on new recipients. Absent for a send the wallet
+    # cannot cover.
+    reason: Literal["debt_limit", "free_tier_limit"]
     wallet: Wallet
     balanceUsd: float
     requiredUsd: float  # The least top-up that makes the request succeed
@@ -303,6 +323,8 @@ class PaymentRequiredDetails(TypedDict, total=False):
     pricePerOutboundEmailUsd: float
     pricePerIntroductionUsd: float
     topupEndpoint: str
+    newRecipientsPerDay: int  # For `free_tier_limit`: never-seen recipients per UTC day
+    newRecipientsUsedToday: int  # For `free_tier_limit`: of those, already used today
 
 
 class ListTransactionsResponse(TypedDict):

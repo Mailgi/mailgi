@@ -26,6 +26,7 @@ export type {
   BillingInfo,
   BillingNotice,
   DepositAddresses,
+  FreeTier,
   PaymentRequiredDetails,
   Prices,
   StandingStatus,

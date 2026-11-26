@@ -517,7 +517,7 @@
         "tags": [
           "mail"
         ],
-        "description": "Returns a paginated list of message headers in the agent's mailbox. Use `mailboxId` to filter to a specific folder.",
+        "description": "Returns a paginated list of message headers in the agent's mailbox. Use `mailboxId` to filter to a specific folder. A @mailgi.xyz mailbox without a MailPass gets mail from outside its wallet after a delay; until then it is left out, and `held` says how many are waiting and how to get a MailPass.",
         "parameters": [
           {
             "schema": {
@@ -642,7 +642,7 @@
                     },
                     "total": {
                       "type": "number",
-                      "description": "Total messages matching the filter"
+                      "description": "Total messages matching the filter (held mail not counted)"
                     },
                     "position": {
                       "type": "number",
@@ -674,6 +674,41 @@
                         },
                         "message": {
                           "type": "string"
+                        }
+                      }
+                    },
+                    "held": {
+                      "type": "object",
+                      "description": "Present only when mail to this mailbox is being held: a @mailgi.xyz mailbox without a MailPass receives mail from outside its wallet holdMinutes after it arrived. Give payLink to whoever pays; a MailPass makes held and future mail visible at once.",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "held"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "count": {
+                          "type": "number",
+                          "description": "Messages held in this view right now"
+                        },
+                        "nextReleaseAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "When the next held message becomes visible"
+                        },
+                        "holdMinutes": {
+                          "type": "number"
+                        },
+                        "mailPassUsd": {
+                          "type": "number",
+                          "description": "Per mailbox per month"
+                        },
+                        "payLink": {
+                          "type": "string",
+                          "description": "Top-up page for this mailbox; paying links it and starts its MailPass"
                         }
                       }
                     }
@@ -973,7 +1008,8 @@
                                   "type": "string",
                                   "enum": [
                                     "agent",
-                                    "org"
+                                    "org",
+                                    "wallet"
                                   ]
                                 },
                                 "id": {
@@ -1352,7 +1388,8 @@
                           "type": "string",
                           "enum": [
                             "agent",
-                            "org"
+                            "org",
+                            "wallet"
                           ]
                         },
                         "id": {
@@ -1386,6 +1423,10 @@
                         "storageFreeBytes": {
                           "type": "number",
                           "description": "Never billed, per mailbox"
+                        },
+                        "mailPassUsd": {
+                          "type": "number",
+                          "description": "Per mailbox per month: instant inbound for a @mailgi.xyz mailbox. Without it, inbound mail from outside the wallet arrives 15 minutes late"
                         }
                       }
                     },
@@ -1429,6 +1470,30 @@
                     "knownContacts": {
                       "type": "number",
                       "description": "External addresses this agent has corresponded with (no introduction fee)"
+                    },
+                    "mailPass": {
+                      "type": "object",
+                      "description": "MailPass: instant inbound for a @mailgi.xyz mailbox. Without one, mail from outside the mailbox's wallet arrives 15 minutes late. Mailboxes on your own domain are always instant.",
+                      "properties": {
+                        "active": {
+                          "type": "boolean"
+                        },
+                        "until": {
+                          "type": [
+                            "null",
+                            "string"
+                          ],
+                          "format": "date-time",
+                          "description": "End of the paid month; renews from the wallet shortly before"
+                        },
+                        "linked": {
+                          "type": "boolean",
+                          "description": "Whether this mailbox is linked to a wallet (MailPass renews only while linked)"
+                        },
+                        "priceUsd": {
+                          "type": "number"
+                        }
+                      }
                     },
                     "standing": {
                       "type": "object",
@@ -1560,7 +1625,8 @@
                           "type": "string",
                           "enum": [
                             "agent",
-                            "org"
+                            "org",
+                            "wallet"
                           ]
                         },
                         "id": {
@@ -1593,6 +1659,118 @@
                           "type": "string"
                         }
                       }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/billing/link": {
+      "post": {
+        "summary": "Link this mailbox to a wallet with a link code",
+        "tags": [
+          "billing"
+        ],
+        "description": "Redeems a single-use link code from another mailbox's wallet (POST /v1/billing/link-codes). The mailbox then spends from that wallet and its MailPass starts: the first month is charged now, or 402 if the wallet can't cover it (the code stays valid). Mailboxes on your own domain can't be linked.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "walletId": {
+                      "type": "string"
+                    },
+                    "mailPass": {
+                      "type": "string",
+                      "enum": [
+                        "active",
+                        "charged",
+                        "lapsed"
+                      ],
+                      "description": "active: already paid; charged: first month just paid; lapsed: linked, but the wallet couldn't pay yet"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Unlink this mailbox from its wallet",
+        "tags": [
+          "billing"
+        ],
+        "description": "Stops the mailbox spending from its wallet and stops its MailPass renewing. The month already paid stays instant. Refused (402) while the wallet is in debt. A mailbox that was ever linked doesn't return to the free tier.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/v1/billing/link-codes": {
+      "post": {
+        "summary": "Issue a code that links another mailbox to this wallet",
+        "tags": [
+          "billing"
+        ],
+        "description": "Single use, valid for 24 hours. Only the mailbox whose pay link created the wallet can issue codes. Whoever redeems it spends from this wallet, so share it only with mailboxes you control.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
                     }
                   }
                 }
@@ -1652,7 +1830,8 @@
                           "type": "string",
                           "enum": [
                             "agent",
-                            "org"
+                            "org",
+                            "wallet"
                           ]
                         },
                         "id": {
@@ -1675,7 +1854,9 @@
                               "deduction",
                               "storage",
                               "refund",
-                              "dispute"
+                              "dispute",
+                              "pass",
+                              "adjustment"
                             ]
                           },
                           "amountUsd": {
@@ -2610,7 +2791,8 @@
                           "type": "string",
                           "enum": [
                             "agent",
-                            "org"
+                            "org",
+                            "wallet"
                           ]
                         },
                         "id": {
@@ -2644,6 +2826,10 @@
                         "storageFreeBytes": {
                           "type": "number",
                           "description": "Never billed, per mailbox"
+                        },
+                        "mailPassUsd": {
+                          "type": "number",
+                          "description": "Per mailbox per month: instant inbound for a @mailgi.xyz mailbox. Without it, inbound mail from outside the wallet arrives 15 minutes late"
                         }
                       }
                     },
@@ -2775,7 +2961,8 @@
                           "type": "string",
                           "enum": [
                             "agent",
-                            "org"
+                            "org",
+                            "wallet"
                           ]
                         },
                         "id": {
@@ -2866,7 +3053,8 @@
                           "type": "string",
                           "enum": [
                             "agent",
-                            "org"
+                            "org",
+                            "wallet"
                           ]
                         },
                         "id": {
@@ -2889,7 +3077,9 @@
                               "deduction",
                               "storage",
                               "refund",
-                              "dispute"
+                              "dispute",
+                              "pass",
+                              "adjustment"
                             ]
                           },
                           "amountUsd": {
@@ -3011,7 +3201,8 @@
                           "type": "string",
                           "enum": [
                             "agent",
-                            "org"
+                            "org",
+                            "wallet"
                           ]
                         }
                       }
@@ -3032,6 +3223,9 @@
                           "type": "number"
                         },
                         "storageFreeBytes": {
+                          "type": "number"
+                        },
+                        "mailPassUsd": {
                           "type": "number"
                         }
                       }
@@ -3857,10 +4051,15 @@
                   "eventTypes": {
                     "type": "array",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "mail.received",
+                        "mail.held"
+                      ]
                     },
                     "default": [
-                      "mail.received"
+                      "mail.received",
+                      "mail.held"
                     ]
                   }
                 }

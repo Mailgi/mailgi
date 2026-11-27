@@ -708,7 +708,15 @@
                         },
                         "payLink": {
                           "type": "string",
-                          "description": "Top-up page for this mailbox; paying links it and starts its MailPass"
+                          "description": "Top-up page for this mailbox; paying funds a wallet, links this mailbox to it and starts its MailPass"
+                        },
+                        "linkEndpoint": {
+                          "type": "string",
+                          "description": "To join a wallet that is already funded instead: redeem a link code from the mailbox that created it"
+                        },
+                        "docUrl": {
+                          "type": "string",
+                          "description": "How MailPass and shared wallets work"
                         }
                       }
                     }
@@ -3370,6 +3378,16 @@
                       "properties": {
                         "kind": {
                           "type": "string"
+                        }
+                      }
+                    },
+                    "mailPass": {
+                      "type": "object",
+                      "nullable": true,
+                      "description": "For a @mailgi.xyz mailbox, once credited: whether it now has a MailPass (instant mail)",
+                      "properties": {
+                        "active": {
+                          "type": "boolean"
                         }
                       }
                     }
